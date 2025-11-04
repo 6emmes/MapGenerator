@@ -1,0 +1,29 @@
+#pragma once
+// Header exposing noise and terrain related constants and functions.
+// These are moved from texture.cpp to separate terrain generation.
+
+#include <cstdint>
+
+// Basic color structure used for terrain mapping.
+struct Color { uint8_t r, g, b; };
+
+// --- Constants -----------------------------------------------------------
+// Texture dimensions (used by both texture generation and noise
+// calculations). Defining here keeps the values in a single place.
+extern const int TEX_W;          // Texture width
+extern const int TEX_H;          // Texture height
+extern const float NOISE_SCALE;          // Controls frequency
+extern const int OCTAVES;                   // Number of fractal layers
+extern const float PERSISTENCE;          // Amplitude decay
+
+// Classic Perlin permutation table.
+extern const int PERM[512];
+
+// Gradient vectors for 2D noise.
+extern const float GRADIENTS[8][2];
+
+// --- Functions ----------------------------------------------------------
+float perlin2D(float x, float y);
+float fbm(float x, float y);
+float MM(float x, float y);
+Color getTerrainPixel(float height);
