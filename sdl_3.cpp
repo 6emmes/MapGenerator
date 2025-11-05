@@ -22,6 +22,9 @@ static SDL_Window *window = nullptr;
 static SDL_Renderer *renderer = nullptr;
 static SDL_Texture *rectTex = nullptr; // texture for rectangle
 static Rect rect;
+// 
+// Shading texture overlay
+static SDL_Texture *shadingTex = nullptr; // shading texture
 
 // No hard‑coded sizes; will be obtained from texture generation.
 
@@ -67,6 +70,19 @@ static int Init()
     }
 	SDL_SetTextureScaleMode(rectTex, SDL_SCALEMODE_NEAREST);
 
+    // Generate shading texture from the same texture data
+    TextureData shadingData = calculateShadingTexture(texData);
+    shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
+    if (!shadingTex) {
+        SDL_Log("SDL_CreateTexture() Shading Error: %s", SDL_GetError());
+        return -1;
+    }
+    if (SDL_UpdateTexture(shadingTex, NULL, shadingData.pixels.data(), shadingData.width * 4) < 0) {
+        SDL_Log("SDL_UpdateTexture() Shading Error: %s", SDL_GetError());
+        return -1;
+    }
+    SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
+
     return 0;
 }
 
@@ -76,6 +92,7 @@ static int Init()
 static void Term()
 {
     if (rectTex) SDL_DestroyTexture(rectTex);
+    if (shadingTex) SDL_DestroyTexture(shadingTex);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -91,6 +108,10 @@ static void Render()
     SDL_FRect dst = { rect.x, rect.y, rect.w * rect.scale, rect.h * rect.scale };
     SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
     SDL_RenderTexture(renderer, rectTex, NULL, &dst);
+    // Overlay shading texture on top of rectangle
+    if (shadingTex) {
+        SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
+    }
 
     SDL_RenderPresent(renderer);
 }
