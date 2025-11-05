@@ -13,3 +13,4 @@ struct TextureData {
 };
 
 TextureData generateTextureRGBA();
+TextureData calculateShadingTexture(const TextureData& heightmap);
