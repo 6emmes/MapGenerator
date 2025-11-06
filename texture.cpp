@@ -34,14 +34,13 @@ inline float Chebyshev(float x, float y) {
 
 // The noise and terrain mapping logic has been moved to terrain.cpp.
 
-TextureData generateTextureRGBA() {
+// Generates a heightmap array before converting to textures.
+std::vector<std::vector<float>> generateHeightMap() {
     srand(time(NULL)); // Seed for reproducibility
     int randX = rand()%1000;
     int randY = rand()%1000;
-    TextureData data;
-    data.width = TEX_W;
-    data.height = TEX_H;
-    data.pixels.resize(TEX_W * TEX_H);
+    // Allocate 2D height map
+    std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
     float maxVal = -1e10f;
     float minVal = 1e10f;
     for (int y = 0; y < TEX_H; ++y) {
@@ -50,23 +49,51 @@ TextureData generateTextureRGBA() {
             float ny = (y + randY) * NOISE_SCALE;
             float value = fbm(nx, ny); // [-1,1]
             // Map to [0,1]
-            float norm = (value+3)/9;
-            norm = norm - 0.5*Chebyshev(x, y)/512;
-            if (norm < 0 ) norm = 0.0;
-            //float norm = value;
+            float norm = (value + 3.f) / 9.f;
+            norm = norm - 0.5f * Chebyshev(x, y) / 512.f;
+            if (norm < 0.f) norm = 0.f;
             if (norm > maxVal) maxVal = norm;
             if (norm < minVal) minVal = norm;
-            //uint8_t intensity = static_cast<uint8_t>(norm * 255.0f);
-            Color c = getTerrainPixel(norm);
-            uint8_t r = c.r;
-            uint8_t g = c.g;
-            uint8_t b = c.b;
-            uint8_t a = 255;
-            data.pixels[y * TEX_W + x] = (r << 24) | (g << 16) | (b << 8) | a;
+            map[y][x] = norm;
         }
     }
     std::cout << "Max Value: " << maxVal << std::endl; //debug
     std::cout << "Min Value: " << minVal << std::endl; //debug
+    return map;
+}
+
+// Convert a height map to a color texture using getTerrainPixel.
+TextureData textureFromHeightMap(const std::vector<std::vector<float>>& map) {
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float h = map[y][x];
+            Color c = getTerrainPixel(h);
+            uint32_t pixel = (c.r << 24) | (c.g << 16) | (c.b << 8) | 0xFF;
+            data.pixels[y * TEX_W + x] = pixel;
+        }
+    }
+    return data;
+}
+
+// Convert a height map to a grayscale texture suitable for shading.
+TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& map) {
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float h = map[y][x];
+            uint8_t val = static_cast<uint8_t>(std::clamp(((h - 0.2f) / 0.8f) * 255.f, 0.f, 255.f));
+            // Store height in red channel only; other channels zero.
+            uint32_t pixel = (val << 24) | (0 << 16) | (0 << 8) | 0xFF;
+            data.pixels[y * TEX_W + x] = pixel;
+        }
+    }
     return data;
 }
 
@@ -126,7 +153,7 @@ TextureData calculateShadingTexture(const TextureData& heightmap) {
                 // Map [-1,1] to [0,255]
                 intensity = static_cast<uint8_t>(std::clamp((dot + 1.0f) * 127.5f, 0.0f, 255.0f));
             }
-            const uint8_t alpha = static_cast<uint8_t>(192); // 75% opacity
+            const uint8_t alpha = static_cast<uint8_t>(128); // 75% opacity
             shade.pixels[y * w + x] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
         }
     }

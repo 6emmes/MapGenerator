@@ -12,5 +12,11 @@ struct TextureData {
     std::vector<uint32_t> pixels;
 };
 
-TextureData generateTextureRGBA();
+// Generates a color texture from a height map
+TextureData textureFromHeightMap(const std::vector<std::vector<float>>& map);
+// Generates a grayscale height texture for shading calculations
+TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& map);
+// Generates a 2D array of height values in the range [0,1].
+std::vector<std::vector<float>> generateHeightMap();
+// Calculates a shading texture from a height texture
 TextureData calculateShadingTexture(const TextureData& heightmap);

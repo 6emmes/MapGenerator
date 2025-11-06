@@ -56,7 +56,11 @@ static int Init()
     rect.scale = 1.0f;
     rect.color.r = 0; rect.color.g = 128; rect.color.b = 255; rect.color.a = 255;
     // Create texture from gradient pixels
-    auto texData = generateTextureRGBA();
+    // Generate height map, then convert to texture for rendering
+    auto heightMap = generateHeightMap();
+    auto texData = textureFromHeightMap(heightMap);
+    // Generate a separate height texture for shading calculations
+    auto heightTexData = heightTextureFromHeightMap(heightMap);
     rect.w = texData.width;
     rect.h = texData.height;
     rectTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
@@ -70,8 +74,8 @@ static int Init()
     }
 	SDL_SetTextureScaleMode(rectTex, SDL_SCALEMODE_NEAREST);
 
-    // Generate shading texture from the same texture data
-    TextureData shadingData = calculateShadingTexture(texData);
+    // Calculate shading texture based on height texture
+    TextureData shadingData = calculateShadingTexture(heightTexData);
     shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
     if (!shadingTex) {
         SDL_Log("SDL_CreateTexture() Shading Error: %s", SDL_GetError());
