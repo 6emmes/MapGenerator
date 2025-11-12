@@ -20,3 +20,5 @@ TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& ma
 std::vector<std::vector<float>> generateHeightMap();
 // Calculates a shading texture from a height texture
 TextureData calculateShadingTexture(const TextureData& heightmap);
+// Saves the given heightmap to a PNG file. Returns true on success.
+bool saveHeightMapPNG(const std::vector<std::vector<float>>& map, const char *filename);

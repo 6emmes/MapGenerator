@@ -36,7 +36,8 @@ inline float Chebyshev(float x, float y) {
 
 // Generates a heightmap array before converting to textures.
 std::vector<std::vector<float>> generateHeightMap() {
-    srand(time(NULL)); // Seed for reproducibility
+    //srand(time(NULL)); // Seed for reproducibility
+    srand(0);
     int randX = rand()%1000;
     int randY = rand()%1000;
     // Allocate 2D height map
@@ -47,13 +48,21 @@ std::vector<std::vector<float>> generateHeightMap() {
         for (int x = 0; x < TEX_W; ++x) {
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
-            float value = fbm(nx, ny); // [-1,1]
-            // Map to [0,1]
-            float norm = (value + 3.f) / 9.f;
-            norm = norm - 0.5f * Chebyshev(x, y) / 512.f;
-            if (norm < 0.f) norm = 0.f;
-            if (norm > maxVal) maxVal = norm;
-            if (norm < minVal) minVal = norm;
+            float value = MM(nx, ny); // [-1,1]
+            
+            if (value < 0.f) value = 0.f;
+            if (value > maxVal) maxVal = value;
+            if (value < minVal) minVal = value;
+            map[y][x] = value;
+        }
+    }
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            // Normalize to [0,1] based on min/max found
+            float norm = map[y][x];
+            norm = (norm - minVal) / (maxVal - minVal);
+            norm = norm*norm;
+            norm = norm - 0.3f * Chebyshev(x, y) / 512.f;
             map[y][x] = norm;
         }
     }
@@ -88,9 +97,9 @@ TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& ma
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             float h = map[y][x];
-            uint8_t val = static_cast<uint8_t>(std::clamp(((h - 0.2f) / 0.8f) * 255.f, 0.f, 255.f));
-            // Store height in red channel only; other channels zero.
-            uint32_t pixel = (val << 24) | (0 << 16) | (0 << 8) | 0xFF;
+            uint8_t val = static_cast<uint8_t>(std::clamp(((h - 0.1f) / 0.9f) * 255.f, 0.f, 255.f));
+            // Store height as greyscale in R,G,B channels
+            uint32_t pixel = (val << 24) | (val << 16) | (val << 8) | 0xFF;
             data.pixels[y * TEX_W + x] = pixel;
         }
     }
@@ -153,7 +162,7 @@ TextureData calculateShadingTexture(const TextureData& heightmap) {
                 // Map [-1,1] to [0,255]
                 intensity = static_cast<uint8_t>(std::clamp((dot + 1.0f) * 127.5f, 0.0f, 255.0f));
             }
-            const uint8_t alpha = static_cast<uint8_t>(128); // 75% opacity
+            const uint8_t alpha = static_cast<uint8_t>(192); // 75% opacity
             shade.pixels[y * w + x] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
         }
     }

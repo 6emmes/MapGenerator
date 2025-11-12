@@ -4,10 +4,10 @@
 #include <vector>
 
 //--- Noise constants ---
-constexpr int TEX_W = 2048;
+constexpr int TEX_W = 1024;
 constexpr int TEX_H = 1024;
-constexpr float NOISE_SCALE = 0.01f;
-constexpr int OCTAVES = 5;
+constexpr float NOISE_SCALE = 0.005f;
+constexpr int OCTAVES = 4;
 constexpr float PERSISTENCE = 0.5f;
 
 //--- Permutation table for Perlin noise
@@ -37,6 +37,8 @@ const int PERM[512] = {
 const float GRADIENTS[8][2] = {
     {1,1}, {-1,1}, {1,-1}, {-1,-1},
     {1,0}, {-1,0}, {0,1}, {0,-1}
+   // {1,1}, {0,1}, {1,0}, {0,0},
+   // {1,0.5}, {0,0.5}, {0.5,1}, {0.5,0}
 };
 
 //--- Helper functions -------------------------------------------------------
@@ -87,10 +89,12 @@ float fbm(float x, float y) {
 float MM(float x, float y) {
     float total = 0.0f;
     float frequency = 1.0f;
-    float amplitude = 1.0f;
-    total += perlin2D(x * frequency, y * frequency) * amplitude;
+    float amplitude = 3.0f;
+    total = perlin2D(x * frequency, y * frequency) * amplitude;
+    frequency *= 2.0f;
+    amplitude *= PERSISTENCE;
     for (int i = 1; i < OCTAVES; ++i) {
-        total += total * perlin2D(x * frequency, y * frequency) * amplitude;
+        total += std::clamp(total,0.1f,1.0f) * perlin2D(x * frequency, y * frequency) * amplitude;
         frequency *= 2.0f;
         amplitude *= PERSISTENCE;
     }
@@ -102,8 +106,8 @@ Color getTerrainPixel(float height) {
     height = std::max(0.0f, std::min(1.0f, height));
     std::vector<std::pair<float, Color>> ramp = {
         {0.0f,   {0, 0, 255}},      // Blue
-        {0.199f, {0, 0, 255}},      // Blue
-        {0.2f,   {0, 77, 0}},       // Dark Green
+        {0.099f, {0, 0, 255}},      // Blue
+        {0.1f,   {0, 77, 0}},       // Dark Green
         {0.35f,  {0, 204, 0}},     // Green
         {0.5f,   {255, 255, 0}},    // Yellow
         {0.65f,  {255, 128, 0}},   // Orange

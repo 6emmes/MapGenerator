@@ -131,15 +131,25 @@ int main(int argc, char *argv[])
     while (running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) running = false;
-            // Mousewheel zoom
+            // Mousewheel zoom – scale around cursor.
             if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+                // Preserve old scale for coordinate recomputation
+                float oldScale = rect.scale;
                 if (event.wheel.y > 0) {
                     rect.scale *= 1.1f;
                 } else if (event.wheel.y < 0) {
                     rect.scale /= 1.1f;
                 }
+                // Clamp scale to avoid excessive zoom
                 if (rect.scale < 0.1f) rect.scale = 0.1f;
                 if (rect.scale > 10.0f) rect.scale = 10.0f;
+
+                // Recenter rectangle so the cursor stays over the same point
+                float mx, my;
+                SDL_GetMouseState(&mx, &my);
+                float factor = rect.scale / oldScale; // new / old
+                rect.x = mx - (mx - rect.x) * factor;
+                rect.y = my - (my - rect.y) * factor;
             }
         }
         Uint32 now = SDL_GetTicks();
@@ -147,12 +157,12 @@ int main(int argc, char *argv[])
         last = now;
         // movement handled via keyboard state
         const bool *keys = SDL_GetKeyboardState(nullptr);
-        if (keys[SDL_SCANCODE_LEFT])  rect.x -= rect.speed * dt;
-        if (keys[SDL_SCANCODE_RIGHT]) rect.x += rect.speed * dt;
-        if (keys[SDL_SCANCODE_UP])    rect.y -= rect.speed * dt;
-        if (keys[SDL_SCANCODE_DOWN])  rect.y += rect.speed * dt;
+        if (keys[SDL_SCANCODE_LEFT])  rect.x += rect.speed * dt;
+        if (keys[SDL_SCANCODE_RIGHT]) rect.x -= rect.speed * dt;
+        if (keys[SDL_SCANCODE_UP])    rect.y += rect.speed * dt;
+        if (keys[SDL_SCANCODE_DOWN])  rect.y -= rect.speed * dt;
         Render();
-        SDL_Delay(16); // cap ~60fps
+        SDL_Delay(30); // cap ~30fps
     }
     Term();
     return 0;
