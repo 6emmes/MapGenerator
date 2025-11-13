@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <vector>
 #include "texture.h"
+#include "terrain.h"
 
 // A simple movable rectangle.
 struct Rect
@@ -57,11 +58,10 @@ static int Init()
     rect.color.r = 0; rect.color.g = 128; rect.color.b = 255; rect.color.a = 255;
     // Create texture from gradient pixels
     // Generate height map, then convert to texture for rendering
+    // Load rendering configuration from file before generating map
+    loadConfig("mapgen.conf");
     auto heightMap = generateHeightMap();
     // Save height map to PNG and BMP for debugging.
-    if (!saveHeightMapPNG(heightMap, "heightmap.png")) {
-        SDL_Log("Failed to write heightmap PNG");
-    }
     if (!saveHeightMapBMP(heightMap, "heightmap.bmp")) {
         SDL_Log("Failed to write heightmap BMP");
     }

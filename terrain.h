@@ -3,6 +3,7 @@
 // These are moved from texture.cpp to separate terrain generation.
 
 #include <cstdint>
+#include <string>
 
 // Basic color structure used for terrain mapping.
 struct Color { uint8_t r, g, b; };
@@ -10,11 +11,17 @@ struct Color { uint8_t r, g, b; };
 // --- Constants -----------------------------------------------------------
 // Texture dimensions (used by both texture generation and noise
 // calculations). Defining here keeps the values in a single place.
-extern const int TEX_W;          // Texture width
-extern const int TEX_H;          // Texture height
+// Runtime configuration variables. They are set by the configuration
+// loader in terrain.cpp and can be changed before any texture
+// generation starts.  The defaults are defined in terrain.cpp.
+extern int TEX_W;          // Texture width
+extern int TEX_H;          // Texture height
 extern const float NOISE_SCALE;          // Controls frequency
-extern const int OCTAVES;                   // Number of fractal layers
+extern int OCTAVES;                   // Number of fractal layers
 extern const float PERSISTENCE;          // Amplitude decay
+
+// Load configuration from a file.  The function is defined in terrain.cpp.
+void loadConfig(const std::string &path);
 
 // Classic Perlin permutation table.
 extern const int PERM[512];

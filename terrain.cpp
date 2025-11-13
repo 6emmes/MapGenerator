@@ -2,13 +2,62 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <fstream>
+#include <string>
 
 //--- Noise constants ---
-constexpr int TEX_W = 1024;
-constexpr int TEX_H = 1024;
+// The following variables are defined with default values.  They
+// may be overridden by a configuration file loaded at runtime.
+int TEX_W = 1024;
+int TEX_H = 1024;
 constexpr float NOISE_SCALE = 0.005f;
-constexpr int OCTAVES = 9;
+int OCTAVES = 9;
 constexpr float PERSISTENCE = 0.5f;
+//
+// Load configuration values from a simple key=value file.
+// Supported keys: octaves, tex_w, tex_h.
+// Each key should appear on its own line. Lines starting with `#`
+// are comments and ignored. Whitespace around keys and values is
+// trimmed.
+// Example:
+//   octaves=9
+//   tex_w=1024
+//   tex_h=1024
+// If a key is missing the default value remains unchanged.
+void loadConfig(const std::string &path) {
+    std::ifstream fin(path);
+    if (!fin.is_open()) return; // silently ignore missing file
+    std::string line;
+    while (std::getline(fin, line)) {
+        // Remove comments and trim whitespace
+        auto comment = line.find('#');
+        if (comment != std::string::npos) line.erase(comment);
+        // Trim leading/trailing whitespace
+        auto start = line.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) continue;
+        auto end = line.find_last_not_of(" \t\r\n");
+        line = line.substr(start, end - start + 1);
+        if (line.empty()) continue;
+        auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+        // Trim key/value
+        auto kstart = key.find_first_not_of(" \t");
+        auto kend = key.find_last_not_of(" \t");
+        key = key.substr(kstart, kend - kstart + 1);
+        auto vstart = val.find_first_not_of(" \t");
+        auto vend = val.find_last_not_of(" \t");
+        val = val.substr(vstart, vend - vstart + 1);
+        try {
+            if (key == "octaves") OCTAVES = std::stoi(val);
+            else if (key == "tex_w") TEX_W = std::stoi(val);
+            else if (key == "tex_h") TEX_H = std::stoi(val);
+        } catch (...) {
+            // ignore malformed integers
+        }
+    }
+}
 
 //--- Permutation table for Perlin noise
 const int PERM[512] = {
