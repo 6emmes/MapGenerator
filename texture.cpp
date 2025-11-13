@@ -48,7 +48,7 @@ std::vector<std::vector<float>> generateHeightMap() {
         for (int x = 0; x < TEX_W; ++x) {
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
-            float value = MM(nx, ny); // [-1,1]
+            float value = MM(nx, ny)+10;
             
             if (value < 0.f) value = 0.f;
             if (value > maxVal) maxVal = value;
@@ -61,8 +61,8 @@ std::vector<std::vector<float>> generateHeightMap() {
             // Normalize to [0,1] based on min/max found
             float norm = map[y][x];
             norm = (norm - minVal) / (maxVal - minVal);
-            norm = norm*norm;
-            norm = norm - 0.3f * Chebyshev(x, y) / 512.f;
+            //norm = norm - 0.3f * Chebyshev(x, y) / 512.f;
+            norm = simpleMap(norm);
             map[y][x] = norm;
         }
     }
@@ -81,6 +81,11 @@ TextureData textureFromHeightMap(const std::vector<std::vector<float>>& map) {
         for (int x = 0; x < TEX_W; ++x) {
             float h = map[y][x];
             Color c = getTerrainPixel(h);
+            if (h < 0.1f) {
+                uint32_t pixel = (c.r << 24) | (c.g << 16) | (c.b << 8) | 127;
+                data.pixels[y * TEX_W + x] = pixel;
+                continue;
+            }
             uint32_t pixel = (c.r << 24) | (c.g << 16) | (c.b << 8) | 0xFF;
             data.pixels[y * TEX_W + x] = pixel;
         }
@@ -162,7 +167,7 @@ TextureData calculateShadingTexture(const TextureData& heightmap) {
                 // Map [-1,1] to [0,255]
                 intensity = static_cast<uint8_t>(std::clamp((dot + 1.0f) * 127.5f, 0.0f, 255.0f));
             }
-            const uint8_t alpha = static_cast<uint8_t>(192); // 75% opacity
+            const uint8_t alpha = static_cast<uint8_t>(128); // 75% opacity
             shade.pixels[y * w + x] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
         }
     }

@@ -7,7 +7,7 @@ CXXFLAGS = -I/home/q/SDL3-win/include
 LDFLAGS  = -L/home/q/SDL3-win/lib -lSDL3
 
 TARGETS  = sdl_3.exe
-SRCS     = sdl_3.cpp texture.cpp terrain.cpp
+SRCS     = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp
 
 all: $(TARGETS)
 

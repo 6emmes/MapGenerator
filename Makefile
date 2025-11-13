@@ -6,7 +6,7 @@ CFLAGS = -I/usr/local/include/SDL3
 LDFLAGS = -L/usr/local/lib -lSDL3
 
 TARGETS = sdl_3
-SRCS = sdl_3.cpp texture.cpp terrain.cpp image_write.cpp
+SRCS = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp
 
 all: $(TARGETS)
 

@@ -7,7 +7,7 @@
 constexpr int TEX_W = 1024;
 constexpr int TEX_H = 1024;
 constexpr float NOISE_SCALE = 0.005f;
-constexpr int OCTAVES = 4;
+constexpr int OCTAVES = 9;
 constexpr float PERSISTENCE = 0.5f;
 
 //--- Permutation table for Perlin noise
@@ -35,8 +35,8 @@ const int PERM[512] = {
 
 // Gradient vectors for 2D Perlin noise
 const float GRADIENTS[8][2] = {
-    {1,1}, {-1,1}, {1,-1}, {-1,-1},
-    {1,0}, {-1,0}, {0,1}, {0,-1}
+    {-1,1}, {1,1}, {1,-1}, {-1,-1},
+    {1,0}, {0,-1}, {0,1}, {-1,0}
    // {1,1}, {0,1}, {1,0}, {0,0},
    // {1,0.5}, {0,0.5}, {0.5,1}, {0.5,0}
 };
@@ -50,11 +50,13 @@ inline float lerp(float t, float a, float b) {
     return a + t * (b - a);
 }
 
-inline float grad(int hash, float x, float y) {
-    int h = hash & 7;
+inline float grad(int hash) {
+    //return ((hash & 1) ? x : -x) + ((hash & 2) ?  2.0f * y : -2.0f * y);
+    int h = hash % 8;
     float u = GRADIENTS[h][0];
     float v = GRADIENTS[h][1];
-    return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
+    return u + 2.0f * v;
+    //return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
 }
 
 //--- Perlin noise ------------------------------------------------------------
@@ -69,8 +71,8 @@ float perlin2D(float x, float y) {
     int ab = PERM[PERM[xi] + yi + 1];
     int ba = PERM[PERM[xi + 1] + yi];
     int bb = PERM[PERM[xi + 1] + yi + 1];
-    float x1 = lerp(u, grad(aa, xf, yf), grad(ba, xf - 1.0f, yf));
-    float x2 = lerp(u, grad(ab, xf, yf - 1.0f), grad(bb, xf - 1.0f, yf - 1.0f));
+    float x1 = lerp(u, grad(aa), grad(ba));
+    float x2 = lerp(u, grad(ab), grad(bb));
     return lerp(v, x1, x2);
 }
 
@@ -99,6 +101,19 @@ float MM(float x, float y) {
         amplitude *= PERSISTENCE;
     }
     return total;
+}
+
+float simpleMap(float val) {
+    const float breakpoint = 0.75f;
+    const float slope1 = 0.2f;   // can be chosen
+    const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
+
+    if (val <= breakpoint) {
+        return slope1 * val;
+    } else {
+        float intercept = slope1 * breakpoint;
+        return intercept + slope2 * (val - breakpoint);
+    }
 }
 
 //--- Terrain color mapping ----------------------------------------------------

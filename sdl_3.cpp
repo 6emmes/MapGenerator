@@ -58,6 +58,13 @@ static int Init()
     // Create texture from gradient pixels
     // Generate height map, then convert to texture for rendering
     auto heightMap = generateHeightMap();
+    // Save height map to PNG and BMP for debugging.
+    if (!saveHeightMapPNG(heightMap, "heightmap.png")) {
+        SDL_Log("Failed to write heightmap PNG");
+    }
+    if (!saveHeightMapBMP(heightMap, "heightmap.bmp")) {
+        SDL_Log("Failed to write heightmap BMP");
+    }
     auto texData = textureFromHeightMap(heightMap);
     // Generate a separate height texture for shading calculations
     auto heightTexData = heightTextureFromHeightMap(heightMap);
