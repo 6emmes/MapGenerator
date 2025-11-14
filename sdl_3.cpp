@@ -164,6 +164,23 @@ int main(int argc, char *argv[])
                 rect.x = mx - (mx - rect.x) * factor;
                 rect.y = my - (my - rect.y) * factor;
             }
+            // Handle numeric key toggles
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                // Table of keys to flag pointers – can be extended.
+                static const struct {
+                    SDL_Scancode scancode;
+                    bool *flag;
+                } toggles[] = {
+                    {SDL_SCANCODE_1, &g_showTerrainTex},
+                    {SDL_SCANCODE_2, &g_showShadingTex},
+                };
+                for (const auto &t : toggles) {
+                if (event.key.scancode == t.scancode) {
+                        *(t.flag) = !*(t.flag);
+                        break;
+                    }
+                }
+            }
         }
         Uint32 now = SDL_GetTicks();
         float dt = (now - last) / 1000.0f;
