@@ -21,11 +21,15 @@ struct Rect
 
 static SDL_Window *window = nullptr;
 static SDL_Renderer *renderer = nullptr;
-static SDL_Texture *rectTex = nullptr; // texture for rectangle
+// Texture representing the terrain surface. Renamed from rectTex for clarity
+static SDL_Texture *terrainTex = nullptr; // texture for terrain
 static Rect rect;
 // 
 // Shading texture overlay
 static SDL_Texture *shadingTex = nullptr; // shading texture
+// Flags to enable/disable rendering of textures
+static bool g_showTerrainTex = true;
+static bool g_showShadingTex = true;
 
 // No hard‑coded sizes; will be obtained from texture generation.
 
@@ -70,16 +74,16 @@ static int Init()
     auto heightTexData = heightTextureFromHeightMap(heightMap);
     rect.w = texData.width;
     rect.h = texData.height;
-    rectTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
-    if (!rectTex) {
+    terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
+    if (!terrainTex) {
         SDL_Log("SDL_CreateTexture() Error: %s", SDL_GetError());
         return -1;
     }
-    if (SDL_UpdateTexture(rectTex, NULL, texData.pixels.data(), texData.width * 4) < 0) {
+    if (SDL_UpdateTexture(terrainTex, NULL, texData.pixels.data(), texData.width * 4) < 0) {
         SDL_Log("SDL_UpdateTexture() Error: %s", SDL_GetError());
         return -1;
     }
-	SDL_SetTextureScaleMode(rectTex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
 
     // Calculate shading texture based on height texture
     TextureData shadingData = calculateShadingTexture(heightTexData);
@@ -102,7 +106,7 @@ static int Init()
 
 static void Term()
 {
-    if (rectTex) SDL_DestroyTexture(rectTex);
+    if (terrainTex) SDL_DestroyTexture(terrainTex);
     if (shadingTex) SDL_DestroyTexture(shadingTex);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -117,10 +121,12 @@ static void Render()
     SDL_RenderClear(renderer);
 
     SDL_FRect dst = { rect.x, rect.y, rect.w * rect.scale, rect.h * rect.scale };
-    SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
-    SDL_RenderTexture(renderer, rectTex, NULL, &dst);
-    // Overlay shading texture on top of rectangle
-    if (shadingTex) {
+    if (g_showTerrainTex && terrainTex) {
+        SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
+        SDL_RenderTexture(renderer, terrainTex, NULL, &dst);
+    }
+    // Overlay shading texture on top of rectangle, if enabled
+    if (g_showShadingTex && shadingTex) {
         SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
     }
 
@@ -169,7 +175,7 @@ int main(int argc, char *argv[])
         if (keys[SDL_SCANCODE_UP])    rect.y += rect.speed * dt;
         if (keys[SDL_SCANCODE_DOWN])  rect.y -= rect.speed * dt;
         Render();
-        SDL_Delay(30); // cap ~30fps
+        SDL_Delay(16); // cap ~60fps
     }
     Term();
     return 0;

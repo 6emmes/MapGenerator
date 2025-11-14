@@ -11,36 +11,32 @@
 #include <iostream> //debug
 #include <algorithm>
 
-// Constants moved to terrain.h. Only texture generation remains.
 
-// Chebyshev distance helper used for texture distortion
-inline float Chebyshev(float x, float y) {
-    // Center coordinates around the texture origin
+inline float Chebyshev(float x, float y, float deadzone=0.0f) {
     float cx = x - TEX_W / 2.0f;
     float cy = y - TEX_H / 2.0f;
-    // Compute aspect ratio to stretch distance in the longer axis.
-    // If the texture is wider than it is tall, distances in X are scaled
-    // up by the width/height ratio. Vice versa for taller textures.
+    float distance = 0.0f;
     float ratio = static_cast<float>(TEX_H) / static_cast<float>(TEX_W);
     if (ratio > 1.0f) {
-        // Width dominates: stretch in X
         cx *= ratio;
     } else {
-        // Height dominates: stretch in Y
-        cy /= ratio; // effectively stretch in Y by ratio = H/W >1
+        cy /= ratio;
     }
-    return std::max(std::abs(cx), std::abs(cy));
+    distance = std::max(std::abs(cx), std::abs(cy))/ (TEX_W / 2.0f);
+    if (deadzone < distance) {
+        return 0.0f;
+    }   else {
+        return distance - deadzone;
+    }   
 }
 
-// The noise and terrain mapping logic has been moved to terrain.cpp.
 
-// Generates a heightmap array before converting to textures.
 std::vector<std::vector<float>> generateHeightMap() {
     //srand(time(NULL)); // Seed for reproducibility
     srand(0);
     int randX = rand()%1000;
     int randY = rand()%1000;
-    // Allocate 2D height map
+    
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
     float maxVal = -1e10f;
     float minVal = 1e10f;
@@ -61,13 +57,11 @@ std::vector<std::vector<float>> generateHeightMap() {
             // Normalize to [0,1] based on min/max found
             float norm = map[y][x];
             norm = (norm - minVal) / (maxVal - minVal);
-            //norm = norm - 0.3f * Chebyshev(x, y) / 512.f;
+            //norm = norm - 1.5 * Chebyshev(x, y, 0.7);
             norm = simpleMap(norm);
             map[y][x] = norm;
         }
     }
-    std::cout << "Max Value: " << maxVal << std::endl; //debug
-    std::cout << "Min Value: " << minVal << std::endl; //debug
     return map;
 }
 

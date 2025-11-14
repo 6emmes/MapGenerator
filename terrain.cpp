@@ -10,7 +10,7 @@
 // may be overridden by a configuration file loaded at runtime.
 int TEX_W = 1024;
 int TEX_H = 1024;
-constexpr float NOISE_SCALE = 0.005f;
+constexpr float NOISE_SCALE = 0.002f;
 int OCTAVES = 9;
 constexpr float PERSISTENCE = 0.5f;
 //
@@ -149,6 +149,7 @@ float MM(float x, float y) {
         frequency *= 2.0f;
         amplitude *= PERSISTENCE;
     }
+
     return total;
 }
 
