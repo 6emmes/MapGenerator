@@ -167,3 +167,29 @@ TextureData calculateShadingTexture(const TextureData& heightmap) {
     }
     return shade;
 }
+
+// duplicate removed
+
+//-----
+//  climateTextureFromTemperature
+//-----
+// Generate a texture where each pixel's red channel encodes temperature
+// supplied as a matrix of kilo‑Kelvin values. The result is RGBA8888
+// with red channel varying, green/blue zero, alpha opaque.
+TextureData climateTexture(const std::vector<std::vector<double>>& tempMap) {
+    TextureData data;
+    data.width = static_cast<int>(tempMap[0].size());
+    data.height = static_cast<int>(tempMap.size());
+    data.pixels.resize(data.width * data.height);
+    for (int y = 0; y < data.height; ++y) {
+        for (int x = 0; x < data.width; ++x) {
+            double tempK = tempMap[y][x];
+            // Simple linear mapping: 200K -> 0, 400K -> 255
+            //uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 200.0) / 200.0 * 255.0, 0.0, 255.0));
+            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 200.0) / 200.0 * 255.0, 0.0, 255.0));
+            uint32_t pixel = (r << 24) | (0 << 16) | (0 << 8) | 0xFF;
+            data.pixels[y * data.width + x] = pixel;
+        }
+    }
+    return data;
+}

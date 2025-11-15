@@ -100,8 +100,7 @@ std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
             }
             double tempShiftK = 6.5 * (altitudeMeters / 1000.0); // K
             double tempK = baseTemperatureK - tempShiftK;
-            double kiloKelvin = tempK / 1000.0;
-            tempMap[y][x] = kiloKelvin;
+            tempMap[y][x] = tempK;
         }
     }
     return tempMap;

@@ -8,6 +8,8 @@
 #include <vector>
 #include "texture.h"
 #include "terrain.h"
+// Function to compute temperature map from height map
+extern std::vector<std::vector<double>> calculateTemperatureMap(int width, int height, const std::vector<std::vector<float>>& heightmap);
 
 // A simple movable rectangle.
 struct Rect
@@ -27,9 +29,13 @@ static Rect rect;
 // 
 // Shading texture overlay
 static SDL_Texture *shadingTex = nullptr; // shading texture
+// Climate texture overlay (red channel temperature)
+static SDL_Texture *climateTex = nullptr;
 // Flags to enable/disable rendering of textures
 static bool g_showTerrainTex = true;
 static bool g_showShadingTex = true;
+static bool g_showClimateTex = false;
+    // Flags already defined above at file scope
 
 // No hard‑coded sizes; will be obtained from texture generation.
 
@@ -98,6 +104,21 @@ static int Init()
     }
     SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
 
+    // Create climate texture overlay using temperature map
+    // Temperature map in kilo-Kelvin values, computed from height map
+    auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
+    TextureData climateData = climateTexture(tempMap);
+    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
+    if (!climateTex) {
+        SDL_Log("SDL_CreateTexture() Climate Error: %s", SDL_GetError());
+        return -1;
+    }
+    if (SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), climateData.width * 4) < 0) {
+        SDL_Log("SDL_UpdateTexture() Climate Error: %s", SDL_GetError());
+        return -1;
+    }
+    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
+
     return 0;
 }
 
@@ -128,6 +149,10 @@ static void Render()
     // Overlay shading texture on top of rectangle, if enabled
     if (g_showShadingTex && shadingTex) {
         SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
+    }
+    // Overlay climate texture on top of shading, if enabled
+    if (g_showClimateTex && climateTex) {
+        SDL_RenderTexture(renderer, climateTex, NULL, &dst);
     }
 
     SDL_RenderPresent(renderer);
@@ -173,6 +198,7 @@ int main(int argc, char *argv[])
                 } toggles[] = {
                     {SDL_SCANCODE_1, &g_showTerrainTex},
                     {SDL_SCANCODE_2, &g_showShadingTex},
+                    {SDL_SCANCODE_3, &g_showClimateTex},
                 };
                 for (const auto &t : toggles) {
                 if (event.key.scancode == t.scancode) {
