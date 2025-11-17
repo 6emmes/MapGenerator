@@ -176,7 +176,8 @@ TextureData calculateShadingTexture(const TextureData& heightmap) {
 // Generate a texture where each pixel's red channel encodes temperature
 // supplied as a matrix of kilo‑Kelvin values. The result is RGBA8888
 // with red channel varying, green/blue zero, alpha opaque.
-TextureData climateTexture(const std::vector<std::vector<double>>& tempMap) {
+TextureData climateTexture(const std::vector<std::vector<double>>& tempMap,
+                          const std::vector<std::vector<double>>& humidityMap) {
     TextureData data;
     data.width = static_cast<int>(tempMap[0].size());
     data.height = static_cast<int>(tempMap.size());
@@ -184,10 +185,15 @@ TextureData climateTexture(const std::vector<std::vector<double>>& tempMap) {
     for (int y = 0; y < data.height; ++y) {
         for (int x = 0; x < data.width; ++x) {
             double tempK = tempMap[y][x];
-            // Simple linear mapping: 200K -> 0, 400K -> 255
-            //uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 200.0) / 200.0 * 255.0, 0.0, 255.0));
-            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 200.0) / 200.0 * 255.0, 0.0, 255.0));
-            uint32_t pixel = (r << 24) | (0 << 16) | (0 << 8) | 0xFF;
+            // Temperature red channel: map 300K (~27°C) to 0 and 330K (~57°C) to 255.
+            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 300.0) / 30.0 * 255.0, 0.0, 255.0));
+
+            // Humidity blue channel: Scale 0-30 to 0-255.
+            uint8_t b = 0;
+            double hum = humidityMap[y][x];
+            b = static_cast<uint8_t>(std::clamp((hum) / 30.0 * 255.0, 0.0, 255.0));
+
+            uint32_t pixel = (r << 24) | (0 << 16) | (b << 8) | 0xFF;
             data.pixels[y * data.width + x] = pixel;
         }
     }

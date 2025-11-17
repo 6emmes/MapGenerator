@@ -8,6 +8,7 @@
 #include <vector>
 #include "texture.h"
 #include "terrain.h"
+#include "climate.h"
 // Function to compute temperature map from height map
 extern std::vector<std::vector<double>> calculateTemperatureMap(int width, int height, const std::vector<std::vector<float>>& heightmap);
 
@@ -91,6 +92,22 @@ static int Init()
     }
     SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
 
+    // Create climate texture overlay using temperature map
+    // Temperature map in kilo-Kelvin values, computed from height map
+    auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
+    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap);
+    TextureData climateData = climateTexture(tempMap, humidityMap);
+    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
+    if (!climateTex) {
+        SDL_Log("SDL_CreateTexture() Climate Error: %s", SDL_GetError());
+        return -1;
+    }
+    if (SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), climateData.width * 4) < 0) {
+        SDL_Log("SDL_UpdateTexture() Climate Error: %s", SDL_GetError());
+        return -1;
+    }
+    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
+
     // Calculate shading texture based on height texture
     TextureData shadingData = calculateShadingTexture(heightTexData);
     shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
@@ -103,21 +120,6 @@ static int Init()
         return -1;
     }
     SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
-
-    // Create climate texture overlay using temperature map
-    // Temperature map in kilo-Kelvin values, computed from height map
-    auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    TextureData climateData = climateTexture(tempMap);
-    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
-    if (!climateTex) {
-        SDL_Log("SDL_CreateTexture() Climate Error: %s", SDL_GetError());
-        return -1;
-    }
-    if (SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), climateData.width * 4) < 0) {
-        SDL_Log("SDL_UpdateTexture() Climate Error: %s", SDL_GetError());
-        return -1;
-    }
-    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
 
     return 0;
 }
@@ -146,15 +148,16 @@ static void Render()
         SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
         SDL_RenderTexture(renderer, terrainTex, NULL, &dst);
     }
-    // Overlay shading texture on top of rectangle, if enabled
-    if (g_showShadingTex && shadingTex) {
-        SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
-    }
+
     // Overlay climate texture on top of shading, if enabled
     if (g_showClimateTex && climateTex) {
         SDL_RenderTexture(renderer, climateTex, NULL, &dst);
     }
 
+    // Overlay shading texture on top of rectangle, if enabled
+    if (g_showShadingTex && shadingTex) {
+        SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
+    }
     SDL_RenderPresent(renderer);
 }
 

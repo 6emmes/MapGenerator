@@ -19,6 +19,7 @@ double temperatureFromHeight(double height) {
 #include <fstream>
 #include <string>
 #include <vector>
+#include <iostream>
 
 // Latitude bounds read from configuration
 static double LAT_BOTTOM = 0.0;
@@ -27,8 +28,12 @@ static double LAT_TOP = 30.0;
 // Can be overridden by a configuration entry `maxaltitude`.
 static double MAXALTITUDE = 4000.0; // meters
 
+// Sub-scale factor for temperature map resolution.
+// Can be overridden by a configuration entry `sub_scale`.
+static int SUB_SCALE = 8;
+
 // Load latitude bounds from mapgen.conf
-static void loadLatitudeConfig(const std::string &path) {
+static void loadclimateconfig(const std::string &path) {
     std::ifstream fin(path);
     if (!fin.is_open()) return;
     std::string line;
@@ -54,6 +59,7 @@ static void loadLatitudeConfig(const std::string &path) {
             if (key == "lat_bottom") LAT_BOTTOM = std::stod(val);
             else if (key == "lat_top") LAT_TOP = std::stod(val);
             else if (key == "maxaltitude") MAXALTITUDE = std::stod(val);
+            else if (key == "sub_scale") SUB_SCALE = std::stoi(val);
         } catch (...) {}
     }
 }
@@ -80,7 +86,7 @@ std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
     constexpr double EPSILON = 0.89;
     static bool loaded = false;
     if (!loaded) {
-        loadLatitudeConfig("mapgen.conf");
+        loadclimateconfig("mapgen.conf");
         loaded = true;
     }
     // Ensure MAXALTITUDE has a default if not set by config.
@@ -104,4 +110,36 @@ std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
         }
     }
     return tempMap;
+}
+
+// Calculate a humidity map based purely on temperature.
+// The map is the same dimensions as the input temperature map.
+// Each cell will initially be 0. The function walks the array
+// stepping `SUB_SCALE` cells at a time and marks the visited
+// cells with a value of 1.0.
+// This is a placeholder, but gives the structure for later
+// humidity modeling.
+std::vector<std::vector<double>> calculateHumidityMap(
+    int width,
+    int height,
+    const std::vector<std::vector<double>>& tempMap) {
+    // Create blank output array filled with zeros
+    std::vector<std::vector<double>> humidityMap(
+        height, std::vector<double>(width, 0.0));
+
+    // Iterate over every sub_scale positions
+    for (int y = 0; y < height; y += SUB_SCALE) {
+        for (int x = 0; x < width; x += SUB_SCALE) {
+            // Ensure the dimensions are divisible by SUB_SCALE
+            if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
+                std::cerr << "Error: width and height must be multiples of "
+                          << SUB_SCALE << std::endl;
+                return humidityMap; // early exit with zeros
+            }
+            int yy = y;
+            int xx = x;
+            humidityMap[yy][xx] = 30.0;
+        }
+    }
+    return humidityMap;
 }

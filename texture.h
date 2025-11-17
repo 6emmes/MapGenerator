@@ -23,4 +23,4 @@ TextureData calculateShadingTexture(const TextureData& heightmap);
 // Saves the given heightmap to a 24‑bit BMP file. Returns true on success.
 bool saveHeightMapBMP(const std::vector<std::vector<float>>& map, const char *filename);
 // New: generate a climate texture where the red channel encodes temperature.
-TextureData climateTexture(const std::vector<std::vector<double>>& tempMap);
+TextureData climateTexture(const std::vector<std::vector<double>>& tempMap, const std::vector<std::vector<double>>& humidityMap);
