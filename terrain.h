@@ -16,7 +16,7 @@ struct Color { uint8_t r, g, b; };
 // generation starts.  The defaults are defined in terrain.cpp.
 extern int TEX_W;          // Texture width
 extern int TEX_H;          // Texture height
-extern const float NOISE_SCALE;          // Controls frequency
+extern float NOISE_SCALE;          // Controls frequency
 extern int OCTAVES;                   // Number of fractal layers
 extern const float PERSISTENCE;          // Amplitude decay
 

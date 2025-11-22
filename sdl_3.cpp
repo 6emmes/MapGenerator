@@ -1,11 +1,9 @@
-// Simple SDL3 rectangle demo.
-// Build with the same command as in the original repository.
-
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <iostream>
 #include "texture.h"
 #include "terrain.h"
 #include "climate.h"
@@ -32,10 +30,12 @@ static Rect rect;
 static SDL_Texture *shadingTex = nullptr; // shading texture
 // Climate texture overlay (red channel temperature)
 static SDL_Texture *climateTex = nullptr;
+static SDL_Texture *riverTex = nullptr;
 // Flags to enable/disable rendering of textures
 static bool g_showTerrainTex = true;
-static bool g_showShadingTex = true;
+static bool g_showShadingTex = false;
 static bool g_showClimateTex = false;
+static bool g_showRiverTex = true;
     // Flags already defined above at file scope
 
 // No hard‑coded sizes; will be obtained from texture generation.
@@ -43,7 +43,7 @@ static bool g_showClimateTex = false;
 // <function moved to gradient.cpp>
 
 static int Init()
-{
+{   
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_Log("SDL_Init() Error: %s", SDL_GetError());
         return -1;
@@ -76,12 +76,27 @@ static int Init()
     if (!saveHeightMapBMP(heightMap, "heightmap.bmp")) {
         SDL_Log("Failed to write heightmap BMP");
     }
+    std::cout<<"map dimensioons: "<<TEX_W<<"x"<<TEX_H<<std::endl;
+    auto riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap);
+    auto riverTexData = riverTexture(riverData);
+    riverTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, riverTexData.width, riverTexData.height);
+    SDL_SetTextureScaleMode(riverTex, SDL_SCALEMODE_NEAREST);
+    if (!riverTex) {
+        SDL_Log("SDL_CreateTexture() River Error: %s", SDL_GetError());
+        return -1;
+    }
+    if (SDL_UpdateTexture(riverTex, NULL, riverTexData.pixels.data(), riverTexData.width * 4) < 0) {
+        SDL_Log("SDL_UpdateTexture() River Error: %s", SDL_GetError());
+        return -1;
+    }
+    SDL_SetTextureBlendMode(riverTex, SDL_BLENDMODE_BLEND);
     auto texData = textureFromHeightMap(heightMap);
     // Generate a separate height texture for shading calculations
     auto heightTexData = heightTextureFromHeightMap(heightMap);
     rect.w = texData.width;
     rect.h = texData.height;
     terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
+    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
     if (!terrainTex) {
         SDL_Log("SDL_CreateTexture() Error: %s", SDL_GetError());
         return -1;
@@ -95,9 +110,10 @@ static int Init()
     // Create climate texture overlay using temperature map
     // Temperature map in kilo-Kelvin values, computed from height map
     auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap);
+    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap);
     TextureData climateData = climateTexture(tempMap, humidityMap);
     climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
+    SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);
     if (!climateTex) {
         SDL_Log("SDL_CreateTexture() Climate Error: %s", SDL_GetError());
         return -1;
@@ -111,6 +127,7 @@ static int Init()
     // Calculate shading texture based on height texture
     TextureData shadingData = calculateShadingTexture(heightTexData);
     shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
+    SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
     if (!shadingTex) {
         SDL_Log("SDL_CreateTexture() Shading Error: %s", SDL_GetError());
         return -1;
@@ -131,6 +148,8 @@ static void Term()
 {
     if (terrainTex) SDL_DestroyTexture(terrainTex);
     if (shadingTex) SDL_DestroyTexture(shadingTex);
+    if (riverTex) SDL_DestroyTexture(riverTex);
+    if (climateTex) SDL_DestroyTexture(climateTex);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -148,7 +167,9 @@ static void Render()
         SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
         SDL_RenderTexture(renderer, terrainTex, NULL, &dst);
     }
-
+    if (g_showRiverTex && riverTex) {
+        SDL_RenderTexture(renderer, riverTex, NULL, &dst);
+    }
     // Overlay climate texture on top of shading, if enabled
     if (g_showClimateTex && climateTex) {
         SDL_RenderTexture(renderer, climateTex, NULL, &dst);
@@ -202,6 +223,7 @@ int main(int argc, char *argv[])
                     {SDL_SCANCODE_1, &g_showTerrainTex},
                     {SDL_SCANCODE_2, &g_showShadingTex},
                     {SDL_SCANCODE_3, &g_showClimateTex},
+                    {SDL_SCANCODE_4, &g_showRiverTex},
                 };
                 for (const auto &t : toggles) {
                 if (event.key.scancode == t.scancode) {

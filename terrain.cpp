@@ -10,9 +10,11 @@
 // may be overridden by a configuration file loaded at runtime.
 int TEX_W = 1024;
 int TEX_H = 1024;
-constexpr float NOISE_SCALE = 0.002f;
+float NOISE_SCALE = 0.002f;
 int OCTAVES = 9;
 constexpr float PERSISTENCE = 0.5f;
+// Seed for random number generation used by generateHeightMap; -1 means use current time
+int SEED = -1;
 //
 // Load configuration values from a simple key=value file.
 // Supported keys: octaves, tex_w, tex_h.
@@ -50,9 +52,11 @@ void loadConfig(const std::string &path) {
         auto vend = val.find_last_not_of(" \t");
         val = val.substr(vstart, vend - vstart + 1);
         try {
-            if (key == "octaves") OCTAVES = std::stoi(val);
-            else if (key == "tex_w") TEX_W = std::stoi(val);
-            else if (key == "tex_h") TEX_H = std::stoi(val);
+        if (key == "octaves") OCTAVES = std::stoi(val);
+        else if (key == "tex_w") TEX_W = std::stoi(val);
+        else if (key == "tex_h") TEX_H = std::stoi(val);
+        else if (key == "seed") SEED = std::stoi(val);
+        else if (key == "noise_scale") NOISE_SCALE = std::stof(val);
         } catch (...) {
             // ignore malformed integers
         }
@@ -154,8 +158,8 @@ float MM(float x, float y) {
 }
 
 float simpleMap(float val) {
-    const float breakpoint = 0.75f;
-    const float slope1 = 0.2f;   // can be chosen
+    const float breakpoint = 0.7f;
+    const float slope1 = 0.3f;   // can be chosen
     const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
 
     if (val <= breakpoint) {
@@ -171,11 +175,10 @@ Color getTerrainPixel(float height) {
     height = std::max(0.0f, std::min(1.0f, height));
     std::vector<std::pair<float, Color>> ramp = {
         {0.0f,   {0, 0, 255}},      // Blue
-        {0.099f, {0, 0, 255}},      // Blue
+        {0.0999f, {0, 0, 255}},      // Blue
         {0.1f,   {0, 77, 0}},       // Dark Green
         {0.35f,  {0, 204, 0}},     // Green
         {0.5f,   {255, 255, 0}},    // Yellow
-        {0.65f,  {255, 128, 0}},   // Orange
         {0.8f,   {255, 0, 0}},      // Red
         {0.9f,   {128, 0, 0}},      // Maroon
         {1.0f,   {255, 255, 255}}   // White
