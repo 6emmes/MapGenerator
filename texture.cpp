@@ -10,6 +10,8 @@
 #include <time.h>
 #include <iostream> //debug
 #include <algorithm>
+// Expose seed variable defined in terrain.cpp
+extern int SEED;
 
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f) {
@@ -32,8 +34,12 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f) {
 
 
 std::vector<std::vector<float>> generateHeightMap() {
-    //srand(time(NULL)); // Seed for reproducibility
-    srand(0);
+    // Seed for reproducibility using SEED from config; if SEED is -1 use current time
+    if (SEED == -1) {
+        srand(time(NULL));
+    } else {
+        srand(SEED);
+    }
     int randX = rand()%1000;
     int randY = rand()%1000;
     
@@ -44,7 +50,7 @@ std::vector<std::vector<float>> generateHeightMap() {
         for (int x = 0; x < TEX_W; ++x) {
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
-            float value = MM(nx, ny)+10;
+            float value = MM(nx, ny);
             
             if (value < 0.f) value = 0.f;
             if (value > maxVal) maxVal = value;
@@ -185,16 +191,32 @@ TextureData climateTexture(const std::vector<std::vector<double>>& tempMap,
     for (int y = 0; y < data.height; ++y) {
         for (int x = 0; x < data.width; ++x) {
             double tempK = tempMap[y][x];
-            // Temperature red channel: map 300K (~27°C) to 0 and 330K (~57°C) to 255.
-            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 300.0) / 30.0 * 255.0, 0.0, 255.0));
+            // Temperature red channel: map 280K (~7°C) to 0 and 320K (~47°C) to 255.
+            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 280.0) / 40.0 * 255.0, 0.0, 255.0));
 
             // Humidity blue channel: Scale 0-30 to 0-255.
             uint8_t b = 0;
             double hum = humidityMap[y][x];
             b = static_cast<uint8_t>(std::clamp((hum) / 30.0 * 255.0, 0.0, 255.0));
 
-            uint32_t pixel = (r << 24) | (0 << 16) | (b << 8) | 0xFF;
+            uint32_t pixel = (0 << 24) | (0 << 16) | (b << 8) | 0xFF;
             data.pixels[y * data.width + x] = pixel;
+        }
+    }
+    return data;
+}
+
+TextureData riverTexture(const std::vector<std::vector<float>>& riverMap) {
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float v = riverMap[y][x];
+            uint8_t val = static_cast<uint8_t>(std::clamp(v * 255.f, 0.f, 255.f));
+            uint32_t pixel = (0 << 24) | (0 << 16) | (val << 8) | val;
+            data.pixels[y * TEX_W + x] = pixel;
         }
     }
     return data;
