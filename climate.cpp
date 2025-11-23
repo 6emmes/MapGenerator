@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <queue>
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -99,14 +100,13 @@ bool outOfBounds(int x, int y, int width, int height, int margin=0) {
 int createRiver(int width, int height, const std::pair<int,int> &originPoint, std::vector<std::vector<float>> &riverMap, std::vector<std::vector<float>> &heightmap) {
     std::pair<int,int> nextstep;
     std::pair<int,int> currentPoint = originPoint;
-    std::pair<float, float> momentum;
-    std::vector<std::pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};//, {0,-2}, {0,2}, {-2,0}, {2,0}};
+    std::vector<std::pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};
     float energy = 1.0f;
-    
+    float curheight = 0.0;
     for(int loo=0;loo<40;loo++){
     
         if (outOfBounds(currentPoint.first, currentPoint.second, width, height, 1)) break;
-        float curheight = heightmap[currentPoint.second][currentPoint.first];
+        curheight = heightmap[currentPoint.second][currentPoint.first];
         float nextheight = 0;
         for(int i=-1;i<=1;i++){
             for(int j=-1;j<=1;j++){
@@ -120,8 +120,6 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             }
         }
         if (nextheight <= curheight) break; // reached local
-        momentum.first = -1*nextstep.first;
-        momentum.second = -1*nextstep.second;
         currentPoint.first += nextstep.first;
         currentPoint.second += nextstep.second;
     }
@@ -130,90 +128,103 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
     for (int i=-10;i<=10;i++){
         for (int j=-10;j<=10;j++){
             if (outOfBounds(currentPoint.first + i, currentPoint.second + j, width, height)) continue;
-            if (riverMap[currentPoint.second + j][currentPoint.first + i] > 0.6 && 
+            if (riverMap[currentPoint.second + j][currentPoint.first + i] > 0.2 && 
                 (currentPoint.second + j!=originPoint.second || currentPoint.first + i!=originPoint.first)) {
                 //std::cout << "River killed" << std::endl;
                 return 0;
             }
         }
     }
-    std::vector<std::pair<int,int>> path;
-    path.push_back(currentPoint);
-    float curheight;
-    for (int loo=0;loo<RIVER_LENGTH;loo++){
-        if (loo==RIVER_LENGTH-1) {
-            std::cout<<"river reached max length"<<std::endl;
-            break;
-        }
-        if (outOfBounds(currentPoint.first, currentPoint.second, width, height, 2)) {
-            path = {};
-            std::cout << "River oob" << std::endl;
-            break;
-        }
-
-        curheight = heightmap[currentPoint.second][currentPoint.first];
-        float nextheight = curheight;
-        for(auto [i,j] : directions){
-                float nh = heightmap[currentPoint.second + j][currentPoint.first + i];
-                if (nh < nextheight) {
-                    nextheight = nh;
-                    nextstep = std::make_pair(i,j);
-                }
-        }
-
-        if ( currentPoint.first + nextstep.first == path[path.size() - 2].first && currentPoint.second + nextstep.second == path[path.size() - 2].second){
-            nextstep.first = round(momentum.first);
-            nextstep.second = round(momentum.second);
-        }
-
-        if (nextheight >= curheight) {
-            if (energy > 0.0f) {
-                energy=energy-1;
+    std::queue<std::pair<int,int>> tmpPath;
+    std::vector<std::vector<float>> tmpMap(height, std::vector<float>(width, 0.0f));
+    std::pair<int,int> minHeightPoint = currentPoint;
+    std::pair<int,int> loopStart = originPoint;
+    std::pair<int,int> riverEnd;
+    float value = 0.0f;
+    float delta = 0.002f;
+    tmpMap[currentPoint.second][currentPoint.first] = value;
+    tmpPath.emplace(currentPoint);
+    curheight = heightmap[currentPoint.second][currentPoint.first]+0.001;
+    int riverlen = 0;
+    for (int i = 0;i<5000;i++){
+        if (i == 4999){
+            if (std::max(abs(minHeightPoint.first - loopStart.first), abs(minHeightPoint.second - loopStart.second)) > 20) {
+                i = 0;
+                loopStart = minHeightPoint;
+                //riverMap[minHeightPoint.second][minHeightPoint.first] = 1.0f;
+                std::cout << "EXTENDED" << std::endl;
             }
-            else{
-                if (curheight > 0.099){
-                    path = {};
-                    std::cout<<"River dried up before reaching sea a"<<std::endl;
-                }
-                else std::cout << "River dried up, height: "<<curheight << std::endl;
-                break;
+            else return 0;
+        }
+        if (tmpPath.size() == 0) {
+            std::cout << "River dried out" << std::endl;
+            return 0;
+        }
+        currentPoint = tmpPath.front();
+        tmpPath.pop();
+        if (heightmap[currentPoint.second][currentPoint.first] < curheight) {
+            curheight = heightmap[currentPoint.second][currentPoint.first]+0.01;
+            minHeightPoint = currentPoint;
+        }
+        if (heightmap[currentPoint.second][currentPoint.first] < 0.101f) {
+            std::cout << "River reached sea level." << std::endl;
+            //return 1;
+            break;
+        }
+        //riverMap[currentPoint.second][currentPoint.first] = 0.7f;
+        if (outOfBounds(currentPoint.second, currentPoint.first, width, height, 1)) continue;
+        value = tmpMap[currentPoint.second][currentPoint.first];//(tmpMap[currentPoint.second][currentPoint.first]*2+curheight)/3;
+        for (const auto& d : directions) {
+            if (tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] > 0)   continue;
+            if (heightmap[currentPoint.second + d.second][currentPoint.first + d.first] < curheight){
+                tmpPath.emplace(currentPoint.first + d.first, currentPoint.second + d.second);
+                tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] = value+curheight-heightmap[currentPoint.second + d.second][currentPoint.first + d.first];
+                riverlen++;
             }
         }
-        else energy += (curheight - nextheight)*128.0f;
-        currentPoint.first += nextstep.first;//int((nextstep.first + 2*momentum.first)/3);
-        currentPoint.second += nextstep.second;//int((nextstep.second + 2*momentum.second)/3);
-        momentum.first = nextstep.first;//(nextstep.first + momentum.first)/2;
-        momentum.second = nextstep.second;//(nextstep.second + momentum.second)/2;
-        if (path.back() == currentPoint) {
-                std::cout << "River reversed height: "<<curheight <<"->"<<nextheight << "  last step: "<< nextstep.first << "," << nextstep.second << std::endl;
-            break;
+    }
+
+    std::vector<std::pair<int,int>> neighbors;
+    uint16_t index = 0;
+    tmpPath = {};
+    //for (int i=0;i<300;i++){
+    //=====================================================================Reverse trace
+    for (;;){
+        tmpPath.emplace(currentPoint);
+        if (tmpMap[currentPoint.second][currentPoint.first] <= delta) break;
+        //if (riverMap[currentPoint.second][currentPoint.first] > 0) break;
+        float curscore = tmpMap[currentPoint.second][currentPoint.first];
+        neighbors = {};
+        for (const auto& d : directions) {
+            //td::cout << tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] << "   ";
+            if (tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] <= curscore && tmpMap[currentPoint.second + d.second][currentPoint.first + d.first]>0) {
+                neighbors.emplace_back(currentPoint.first + d.first, currentPoint.second + d.second);
+            }
         }
-        if(curheight <= 0.099){
-            std::cout << "River reached sea level" << std::endl;
-            break;
-        }
-        path.push_back(currentPoint);
+        if (neighbors.size() == 0) break;
+        //std::cout<<std::endl;
+        index = index * 37 + 13;
+        currentPoint = neighbors[index%neighbors.size()];
+        //std::cout << "a: "<<currentPoint.second << " "<<currentPoint.first << " "<< neighbors.size() <<std::endl;
     }
-    if (curheight > 0.099){
-        std::cout<<"River dried up before reaching sea b"<<std::endl;
-        return 0;
+    value = 1.0f;
+    int tmpPathSize = tmpPath.size();
+    //=====================================================================Saving the path to the map
+    std::cout  << "River length: "<< tmpPathSize <<"/"<<riverlen<<std::endl;
+    for (int j=0;j<tmpPathSize;j++) {
+        auto p = tmpPath.front();
+        tmpPath.pop();
+        if (riverMap[p.second][p.first] > 0.1) riverMap[p.second][p.first] += value;///2;
+        else riverMap[p.second][p.first] = value;
+        //std::cout << "a: "<<p.second << " "<<p.first << " "<< j <<"/"<< tmpPathSize <<std::endl;
+        value -= delta;
     }
-    if (path.size() < 20) {
-        std::cout<<"River too short"<<std::endl;
-        return 0;
-    } 
-    std::cout<<"River created with length: "<<path.size()<<std::endl;
-    float value = 1.0;
-    for (const auto &p : path) {
-        riverMap[p.second][p.first] = value;
-        value -= 1.0f/512.0f;
-    }
+    //riverMap[originPoint.second][originPoint.first] = 1;
     return 1;
 }
 
 std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     std::vector<std::vector<float>> &heightmap) {
-    std::cout << "Generating river points of size " << width << "x" << height << " n:" << RIVER_COUNT << std::endl;
     std::vector<std::vector<float>> riverMap(height, std::vector<float>(width, 0.0f));
     //std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
     std::mt19937 rng(3);
@@ -233,9 +244,10 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
         }
     }
     int riversmade = 0;
-
+    int a=0;    //debug
     for (const auto &p : points) {
         riversmade += createRiver(width, height, p, riverMap, heightmap);
+        //break;
     }
     std::cout << "Generated " << riversmade <<" rivers out of "<< points.size() << " starting river points in " << RIVER_COUNT << " attempts.\n";
     std::cout << "River map generation complete.\n";

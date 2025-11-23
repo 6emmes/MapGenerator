@@ -52,6 +52,14 @@
         "xtr1common": "cpp",
         "xutility": "cpp",
         "fstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "chrono": "cpp",
+        "forward_list": "cpp",
+        "iomanip": "cpp",
+        "random": "cpp",
+        "ratio": "cpp",
+        "sstream": "cpp",
+        "queue": "cpp",
+        "deque": "cpp"
     }
 }
