@@ -110,7 +110,7 @@ static int Init()
     // Create climate texture overlay using temperature map
     // Temperature map in kilo-Kelvin values, computed from height map
     auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap);
+    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
     TextureData climateData = climateTexture(tempMap, humidityMap);
     climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
     SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);

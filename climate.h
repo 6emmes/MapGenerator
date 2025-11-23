@@ -13,7 +13,8 @@ std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
 // Generates a humidity map (0‑30 range) aligned with temperature map.
 std::vector<std::vector<double>> calculateHumidityMap(int width, int height,
                                                     const std::vector<std::vector<double>>& tempMap,
-                                                    const std::vector<std::vector<float>>& heightmap);
+                                                    const std::vector<std::vector<float>>& heightmap,
+                                                    const std::vector<std::vector<float>>& rivermap);
 // Returns the current subscale value from configuration.
 int getSubscale();
 // Computes saturated absolute humidity (kg/m^3) from temperature in Kelvin.
