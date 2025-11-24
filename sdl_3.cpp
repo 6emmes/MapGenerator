@@ -7,8 +7,6 @@
 #include "texture.h"
 #include "terrain.h"
 #include "climate.h"
-// Function to compute temperature map from height map
-extern std::vector<std::vector<double>> calculateTemperatureMap(int width, int height, const std::vector<std::vector<float>>& heightmap);
 
 // A simple movable rectangle.
 struct Rect
@@ -38,19 +36,54 @@ static bool g_showClimateTex = false;
 static bool g_showRiverTex = true;
     // Flags already defined above at file scope
 
-// No hard‑coded sizes; will be obtained from texture generation.
 
-// <function moved to gradient.cpp>
+void initMapTextures(){
+    loadConfig("mapgen.conf");
+
+    std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> heighTuple = generateHeightMap();
+    std::vector<std::vector<float>> heightMap = std::get<0>(heighTuple);
+    std::vector<std::vector<bool>> landMap = std::get<1>(heighTuple);
+    std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, landMap);
+    std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
+    std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
+
+    TextureData texData = textureFromHeightMap(heightMap);
+    TextureData riverTexData = riverTexture(riverData);
+    TextureData climateData = climateTexture(tempMap, humidityMap);
+    TextureData shadingData = calculateShadingTexture(TEX_W, TEX_H, heightMap, landMap);
+    
+    terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    riverTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+
+    SDL_UpdateTexture(terrainTex, NULL, texData.pixels.data(), TEX_W * 4);
+    SDL_UpdateTexture(riverTex, NULL, riverTexData.pixels.data(), TEX_W * 4);
+    SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), TEX_W * 4);
+    SDL_UpdateTexture(shadingTex, NULL, shadingData.pixels.data(), TEX_W * 4);
+
+
+    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
+
+    SDL_SetTextureScaleMode(riverTex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureBlendMode(riverTex, SDL_BLENDMODE_BLEND);
+
+    SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
+
+    SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
+}
+
 
 static int Init()
 {   
-    loadConfig("mapgen.conf");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_Log("SDL_Init() Error: %s", SDL_GetError());
         return -1;
     }
 
-    window = SDL_CreateWindow("Rectangle Demo", 640, 480, SDL_WINDOW_HIDDEN);
+    window = SDL_CreateWindow("Rectangle Demo", 800, 800, SDL_WINDOW_HIDDEN);
     if (!window) {
         SDL_Log("SDL_CreateWindow() Error: %s", SDL_GetError());
         return -1;
@@ -68,78 +101,11 @@ static int Init()
     rect.speed = 300.0f; // faster horizontal movement
     rect.scale = 1.0f;
     rect.color.r = 0; rect.color.g = 128; rect.color.b = 255; rect.color.a = 255;
-    // Create texture from gradient pixels
-    // Generate height map, then convert to texture for rendering
-    // Load rendering configuration from file before generating map
-    auto heightMap = generateHeightMap();
-    // Save height map to PNG and BMP for debugging.
-    if (!saveHeightMapBMP(heightMap, "heightmap.bmp")) {
-        SDL_Log("Failed to write heightmap BMP");
-    }
-    std::cout<<"map dimensioons: "<<TEX_W<<"x"<<TEX_H<<std::endl;
-    auto riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap);
-    auto riverTexData = riverTexture(riverData);
-    riverTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, riverTexData.width, riverTexData.height);
-    SDL_SetTextureScaleMode(riverTex, SDL_SCALEMODE_NEAREST);
-    if (!riverTex) {
-        SDL_Log("SDL_CreateTexture() River Error: %s", SDL_GetError());
-        return -1;
-    }
-    if (SDL_UpdateTexture(riverTex, NULL, riverTexData.pixels.data(), riverTexData.width * 4) < 0) {
-        SDL_Log("SDL_UpdateTexture() River Error: %s", SDL_GetError());
-        return -1;
-    }
-    SDL_SetTextureBlendMode(riverTex, SDL_BLENDMODE_BLEND);
-    auto texData = textureFromHeightMap(heightMap);
-    rect.w = texData.width;
-    rect.h = texData.height;
-    terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
-    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
-    if (!terrainTex) {
-        SDL_Log("SDL_CreateTexture() Error: %s", SDL_GetError());
-        return -1;
-    }
-    if (SDL_UpdateTexture(terrainTex, NULL, texData.pixels.data(), texData.width * 4) < 0) {
-        SDL_Log("SDL_UpdateTexture() Error: %s", SDL_GetError());
-        return -1;
-    }
-    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
-
-    // Create climate texture overlay using temperature map
-    // Temperature map in kilo-Kelvin values, computed from height map
-    auto tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    auto humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
-    TextureData climateData = climateTexture(tempMap, humidityMap);
-    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, climateData.width, climateData.height);
-    SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);
-    if (!climateTex) {
-        SDL_Log("SDL_CreateTexture() Climate Error: %s", SDL_GetError());
-        return -1;
-    }
-    if (SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), climateData.width * 4) < 0) {
-        SDL_Log("SDL_UpdateTexture() Climate Error: %s", SDL_GetError());
-        return -1;
-    }
-    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
-
-    // Calculate shading texture based on height texture
-    TextureData shadingData = calculateShadingTexture(TEX_W, TEX_H, heightMap);
-    shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
-    SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
-    if (!shadingTex) {
-        SDL_Log("SDL_CreateTexture() Shading Error: %s", SDL_GetError());
-        return -1;
-    }
-    if (SDL_UpdateTexture(shadingTex, NULL, shadingData.pixels.data(), shadingData.width * 4) < 0) {
-        SDL_Log("SDL_UpdateTexture() Shading Error: %s", SDL_GetError());
-        return -1;
-    }
-    SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
-
+    initMapTextures();
+    rect.w = TEX_W;
+    rect.h = TEX_H;
     return 0;
 }
-
-
 
 
 static void Term()

@@ -58,7 +58,7 @@ static void loadclimateconfig(const std::string &path) {
     }
 }
 
-void interpolateMissingValues(std::vector<std::vector<double>>& grid,
+void interpolateMissingValues(std::vector<std::vector<float>>& grid,
                               int subScale) {
     size_t height = grid.size();
     if (height == 0) return;
@@ -78,16 +78,16 @@ void interpolateMissingValues(std::vector<std::vector<double>>& grid,
             size_t y0 = (y / subScale) * subScale;
             size_t y1 = std::min(y0 + static_cast<size_t>(subScale), height - 1);
 
-            double v00 = grid[y0][x0];
-            double v10 = grid[y0][x1];
-            double v01 = grid[y1][x0];
-            double v11 = grid[y1][x1];
+            float v00 = grid[y0][x0];
+            float v10 = grid[y0][x1];
+            float v01 = grid[y1][x0];
+            float v11 = grid[y1][x1];
 
-            double tx = (x1 == x0) ? 0.0 : static_cast<double>(x - x0) / (x1 - x0);
-            double ty = (y1 == y0) ? 0.0 : static_cast<double>(y - y0) / (y1 - y0);
+            float tx = (x1 == x0) ? 0.0 : static_cast<float>(x - x0) / (x1 - x0);
+            float ty = (y1 == y0) ? 0.0 : static_cast<float>(y - y0) / (y1 - y0);
 
             // Bilinear interpolation
-            double interpolated = (1 - tx) * (1 - ty) * v00
+            float interpolated = (1 - tx) * (1 - ty) * v00
                                  + tx * (1 - ty) * v10
                                  + (1 - tx) * ty * v01
                                  + tx * ty * v11;
@@ -100,7 +100,8 @@ bool outOfBounds(int x, int y, int width, int height, int margin=0) {
     return (x < margin || x >= width - margin || y < margin || y >= height - margin);
 }
 
-int createRiver(int width, int height, const std::pair<int,int> &originPoint, std::vector<std::vector<float>> &riverMap, std::vector<std::vector<float>> &heightmap) {
+int createRiver(int width, int height, const std::pair<int,int> &originPoint, std::vector<std::vector<float>> &riverMap,
+    std::vector<std::vector<float>> &heightmap, std::vector<std::vector<bool>> &landMap) {
     std::pair<int,int> nextstep;
     std::pair<int,int> currentPoint = originPoint;
     std::vector<std::pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};
@@ -167,7 +168,7 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             curheight += curheight/200;
             minHeightPoint = currentPoint;
         }
-        if (heightmap[currentPoint.second][currentPoint.first] < 0.101f) {
+        if (landMap[currentPoint.second][currentPoint.first] == false) {
             break;
         }
         if (outOfBounds(currentPoint.second, currentPoint.first, width, height, 1)) continue;
@@ -248,7 +249,8 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
 }
 
 std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
-    std::vector<std::vector<float>> &heightmap) {
+    std::vector<std::vector<float>> &heightmap,
+    std::vector<std::vector<bool>> &landMap) {
     std::vector<std::vector<float>> riverMap(height, std::vector<float>(width, 0.0f));
     //std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
     std::mt19937 rng(3);
@@ -270,7 +272,7 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     int riversmade = 0;
     int a=0;    //debug
     for (const auto &p : points) {
-        riversmade += createRiver(width, height, p, riverMap, heightmap);
+        riversmade += createRiver(width, height, p, riverMap, heightmap, landMap);
         //break;
     }
     std::cout << "Generated " << riversmade <<" rivers out of "<< points.size() << " starting river points in " << RIVER_COUNT << " attempts.\n";
@@ -314,32 +316,32 @@ static inline double incomingSolarEnergy(double latitudeDeg) {
 //   ε = 0.89, STEFAN = 5.67e-8.
 // Heightmap values range from 0.0 (~sea level) to 1.0 (~max altitude).
 // Uses a standard lapse rate (6.5°C per km) to adjust temperature.
-std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
+std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
                                                             const std::vector<std::vector<float>>& heightmap) {
     // Constants
-    constexpr double STEFAN = 5.67e-8;
-    constexpr double EPSILON = 0.89;
+    constexpr float STEFAN = 5.67e-8;
+    constexpr float EPSILON = 0.89;
     static bool loaded = false;
     if (!loaded) {
         loadclimateconfig("mapgen.conf");
         loaded = true;
     }
-    double maxtemp = 0; //debug
-    std::vector<std::vector<double>> tempMap(height, std::vector<double>(width, 0.0));
-    double latDelta = (height > 1) ? (LAT_TOP - LAT_BOTTOM) / double(height - 1) : 0.0;
+    float maxtemp = 0; //debug
+    std::vector<std::vector<float>> tempMap(height, std::vector<float>(width, 0.0));
+    float latDelta = (height > 1) ? (LAT_TOP - LAT_BOTTOM) / float(height - 1) : 0.0;
     for (int y = 0; y < height; ++y) {
-        double lat = LAT_BOTTOM + latDelta * double(y);
-        double power = incomingSolarEnergy(lat); // W/m^2
-        double Te = std::pow((power) / STEFAN, 0.25);
-        double baseTemperatureK = Te * std::pow(2.0 / (2.0 - EPSILON), 0.25); // Kelvin
+        float lat = LAT_BOTTOM + latDelta * float(y);
+        float power = incomingSolarEnergy(lat); // W/m^2
+        float Te = std::pow((power) / STEFAN, 0.25);
+        float baseTemperatureK = Te * std::pow(2.0 / (2.0 - EPSILON), 0.25); // Kelvin
         for (int x = 0; x < width; ++x) {
-            double altitudeMeters = 0.0;
+            float altitudeMeters = 0.0;
             if (y < static_cast<int>(heightmap.size()) &&
                 x < static_cast<int>(heightmap[0].size())) {
                 altitudeMeters = heightmap[y][x] * MAXALTITUDE; // meters
             }
-            double tempShiftK = 6.5 * (altitudeMeters / 1000.0); // K
-            double tempK = baseTemperatureK - tempShiftK;
+            float tempShiftK = 6.5 * (altitudeMeters / 1000.0); // K
+            float tempK = baseTemperatureK - tempShiftK;
             tempMap[y][x] = tempK;
             if (tempK > maxtemp) maxtemp = tempK; // debug
         }
@@ -391,15 +393,15 @@ float calculateWindSimple(float WindComponent, float FromHumidity, float WindSca
 }
 
 
-std::vector<std::vector<double>> calculateHumidityMap(
+std::vector<std::vector<float>> calculateHumidityMap(
     int width,
     int height,
-    const std::vector<std::vector<double>>& tempMap,
+    const std::vector<std::vector<float>>& tempMap,
     const std::vector<std::vector<float>>& heightmap,
     const std::vector<std::vector<float>>& rivermap) {
     // Create blank output array filled with zeros
-    std::vector<std::vector<double>> humidityMap(
-        height, std::vector<double>(width, 0.0));
+    std::vector<std::vector<float>> humidityMap(
+        height, std::vector<float>(width, 0.0));
     if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
         std::cerr << "Error: width and height must be multiples of "
                 << SUB_SCALE << std::endl;

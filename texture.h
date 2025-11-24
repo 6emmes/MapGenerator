@@ -17,12 +17,12 @@ TextureData textureFromHeightMap(const std::vector<std::vector<float>>& map);
 // Generates a grayscale height texture for shading calculations
 TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& map);
 // Generates a 2D array of height values in the range [0,1].
-std::vector<std::vector<float>> generateHeightMap();
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> generateHeightMap();
 // Calculates a shading texture from a height texture
-TextureData calculateShadingTexture(int w, int h, const std::vector<std::vector<float>>& heightmap);
+TextureData calculateShadingTexture(int w, int h, const std::vector<std::vector<float>>& heightmap, std::vector<std::vector<bool>> landMap);
 // Saves the given heightmap to a 24‑bit BMP file. Returns true on success.
 bool saveHeightMapBMP(const std::vector<std::vector<float>>& map, const char *filename);
 // New: generate a climate texture where the red channel encodes temperature.
-TextureData climateTexture(const std::vector<std::vector<double>>& tempMap, const std::vector<std::vector<double>>& humidityMap);
+TextureData climateTexture(const std::vector<std::vector<float>>& tempMap, const std::vector<std::vector<float>>& humidityMap);
 
 TextureData riverTexture(const std::vector<std::vector<float>> &riverMap);
