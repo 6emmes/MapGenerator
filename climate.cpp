@@ -8,6 +8,8 @@
 #include <random>
 #include <chrono>
 #include <utility>
+#include <tuple>
+#include <algorithm>
 
 // Latitude bounds read from configuration
 static double LAT_BOTTOM = 0.0;
@@ -103,8 +105,8 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
     std::pair<int,int> currentPoint = originPoint;
     std::vector<std::pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};
     float curheight = 0.0;
+    //=========================================================move closer to the peak
     for(int loo=0;loo<40;loo++){
-    
         if (outOfBounds(currentPoint.first, currentPoint.second, width, height, 1)) break;
         curheight = heightmap[currentPoint.second][currentPoint.first];
         float nextheight = 0;
@@ -152,29 +154,24 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             if (std::max(abs(minHeightPoint.first - loopStart.first), abs(minHeightPoint.second - loopStart.second)) > 20) {
                 i = 0;
                 loopStart = minHeightPoint;
-                //riverMap[minHeightPoint.second][minHeightPoint.first] = 1.0f;
-                std::cout << "EXTENDED" << std::endl;
             }
             else return 0;
         }
         if (tmpPathFrontier.size() == 0) {
-            std::cout << "River dried out" << std::endl;
             return 0;
         }
         currentPoint = tmpPathFrontier.front();
         tmpPathFrontier.pop();
         if (heightmap[currentPoint.second][currentPoint.first] < curheight) {
-            curheight = heightmap[currentPoint.second][currentPoint.first]+0.01;
+            curheight = heightmap[currentPoint.second][currentPoint.first];
+            curheight += curheight/200;
             minHeightPoint = currentPoint;
         }
         if (heightmap[currentPoint.second][currentPoint.first] < 0.101f) {
-            std::cout << "River reached sea level." << std::endl;
-            //return 1;
             break;
         }
-        //riverMap[currentPoint.second][currentPoint.first] = 0.7f;
         if (outOfBounds(currentPoint.second, currentPoint.first, width, height, 1)) continue;
-        value = tmpMap[currentPoint.second][currentPoint.first];//(tmpMap[currentPoint.second][currentPoint.first]*2+curheight)/3;
+        value = tmpMap[currentPoint.second][currentPoint.first];
         for (const auto& d : directions) {
             if (tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] > 0)   continue;
             if (heightmap[currentPoint.second + d.second][currentPoint.first + d.first] < curheight){
@@ -196,16 +193,13 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
         float curscore = tmpMap[currentPoint.second][currentPoint.first];
         neighbors = {};
         for (const auto& d : directions) {
-            //td::cout << tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] << "   ";
             if (tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] <= curscore && tmpMap[currentPoint.second + d.second][currentPoint.first + d.first]>0) {
                 neighbors.emplace_back(currentPoint.first + d.first, currentPoint.second + d.second);
             }
         }
         if (neighbors.size() == 0) break;
-        //std::cout<<std::endl;
         index = index * 37 + 13;
         currentPoint = neighbors[index%neighbors.size()];
-        //std::cout << "a: "<<currentPoint.second << " "<<currentPoint.first << " "<< neighbors.size() <<std::endl;
     }
     value = 0.02;
     int tmpPathSize = tmpPath.size();
@@ -217,13 +211,13 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
         tmpPath.pop();
         if (riverMap[currentPoint.second][currentPoint.first] > 0) {
             riverFound = 1;
+            //delta = delta*10;
             break;
         }
         else riverMap[currentPoint.second][currentPoint.first] = value;
-        //std::cout << "a: "<<p.second << " "<<p.first << " "<< j <<"/"<< tmpPathSize <<std::endl;
         value += delta;
     }
-    return 1;
+        return 1;
     if (riverFound){
         value = 1;
         float currentValue = riverMap[currentPoint.second][currentPoint.first];
@@ -354,13 +348,49 @@ std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
     return tempMap;
 }
 
-// Calculate a humidity map based purely on temperature.
-// The map is the same dimensions as the input temperature map.
-// Each cell will initially be 0. The function walks the array
-// stepping `SUB_SCALE` cells at a time and marks the visited
-// cells with a value of 1.0.
-// This is a placeholder, but gives the structure for later
-// humidity modeling.
+
+    //Wind direction is {West, North, Up} 
+std::tuple<float, float, float> getWindDirection(float latitudeDeg) {
+    latitudeDeg = std::max(-90.0f, std::min(90.0f, latitudeDeg));
+    std::vector<std::pair<float, std::tuple<float, float, float>>> ramp = {
+        {-90.0f,   {1, 1, 0}},      // Polar Easterlies
+        {-60.0f, {0, 0, 1}},      // Subpolar Low
+        {-45.0f,   {-1, -1, 0}},      // Westerlies
+        {-30.0f,  {0, 0, -1}},      // Subtropical High
+        {-15.0f,   {1, 1, 0}},      // SE Trade
+        {0.0f,   {1, 0, 1}},      // ITCZ
+        {15.0f,   {1, -1, 0}},      // NE Trade
+        {30.0f,  {0, 0, -1}},      // Subtropical High
+        {45.0f,   {-1, 1, 0}},      // Westerlies
+        {60.0f, {0, 0, 1}},      // Subpolar Low
+        {90.0f,   {1, -1, 0}},      // Polar Easterlies
+    };
+    for (size_t i = 1; i < ramp.size(); ++i) {
+        if (latitudeDeg <= ramp[i].first) {
+            float t = (latitudeDeg - ramp[i-1].first) / (ramp[i].first - ramp[i-1].first);
+            std::tuple c = { std::get<0>(ramp[i-1].second) + (std::get<0>(ramp[i].second) - std::get<0>(ramp[i-1].second)) * t,
+                            std::get<1>(ramp[i-1].second) + (std::get<1>(ramp[i].second) - std::get<1>(ramp[i-1].second)) * t,
+                            std::get<2>(ramp[i-1].second) + (std::get<2>(ramp[i].second) - std::get<2>(ramp[i-1].second)) * t};
+            return c;
+        }
+    }
+    return ramp.back().second;
+}
+
+float calculateWind(float WindComponent, float FromHumidity, float AltitudeDelta, float FohenScale, float WindScale){
+    float FohenFactor;
+	if (AltitudeDelta < 0) AltitudeDelta = 0;
+	else if (std::abs(AltitudeDelta) > 0.5) AltitudeDelta = 0;
+	FohenFactor = 1 / (1 + AltitudeDelta * AltitudeDelta * FohenScale);
+	FohenFactor = std::clamp(FohenFactor, 0.0f, 2.0f);
+    return  WindComponent * FromHumidity * FohenFactor * WindScale;
+}
+
+float calculateWindSimple(float WindComponent, float FromHumidity, float WindScale){
+    return  FromHumidity * std::clamp(WindComponent * WindScale, 0.0f, 1.0f);
+}
+
+
 std::vector<std::vector<double>> calculateHumidityMap(
     int width,
     int height,
@@ -379,17 +409,33 @@ std::vector<std::vector<double>> calculateHumidityMap(
     double tmpHumidity;
     int watercells = 0;
     float rivercells = 0;
-    for (int y = 0; y < height; y += SUB_SCALE) {
-        for (int x = 0; x < width; x += SUB_SCALE) {
+    float tmpWindHumidity = 0 ;
+    float tmpSaturationValue;
+    int loopOffset;
+    int tmpIndex; //Used to reverse inner loop direction
+    float latDelta = (height > 1) ? (LAT_TOP - LAT_BOTTOM) / (height - 1) : 0.0;
+    for (int y = 0; y < height; y += SUB_SCALE) {   //north - south
+        float lat = LAT_BOTTOM + latDelta * y;
+
+        std::tuple<float, float, float> winddirection = getWindDirection(lat);
+        float windW = std::get<0>(winddirection);
+        float windN = std::get<1>(winddirection);
+        float windU = std::get<2>(winddirection);
+        if (windW < 0) loopOffset = width-SUB_SCALE;
+        else loopOffset = 0;
+
+        for (int x = 0; x < width; x += SUB_SCALE) {    //east - west
             watercells = 0;
             rivercells = 0;
             tmpHumidity = 0;
+            tmpIndex = abs(loopOffset - x);
+            tmpSaturationValue = saturatedAbsoluteHumidity(tempMap[y][tmpIndex]);
             for (int dy = 0; dy < SUB_SCALE; ++dy) {
                 for (int dx = 0; dx < SUB_SCALE; ++dx) {
                     int yy = y + dy;
-                    int xx = x + dx;
+                    int xx = tmpIndex + dx;
                     if (yy < height && xx < width) {
-                        if (heightmap[yy][xx] < 0.099f) { // arbitrary water threshold
+                        if (heightmap[yy][xx] < 0.101f) {
                             watercells++;
                         }
                         if (rivermap[yy][xx]>0.0){
@@ -398,11 +444,25 @@ std::vector<std::vector<double>> calculateHumidityMap(
                     }
                 }
             }
-            tmpHumidity = saturatedAbsoluteHumidity(tempMap[y][x])*0.85*watercells/(SUB_SCALE*SUB_SCALE); // 85% relative humidity from ocean tiles
-            tmpHumidity += rivercells;
-            humidityMap[y][x] = tmpHumidity;
+            tmpHumidity = tmpSaturationValue*0.85*watercells/(SUB_SCALE*SUB_SCALE); // 85% relative humidity from ocean tiles
+            tmpHumidity += rivercells;///(SUB_SCALE*SUB_SCALE);
+            if (tmpHumidity<0.1*tmpSaturationValue)tmpHumidity = 0.1*tmpSaturationValue;
+            if (y>=SUB_SCALE){   //try wind from north
+                if (windN<0){
+                    tmpWindHumidity = calculateWindSimple(-1*windN, humidityMap[y-SUB_SCALE][tmpIndex], 1.1);
+                    if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
+                }
+            }
+            //East/West wind:
+            if(tmpIndex >= SUB_SCALE){
+                tmpWindHumidity = calculateWindSimple(std::abs(windW), humidityMap[y][tmpIndex-SUB_SCALE], 0.8);
+                if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
+            }
+
+            humidityMap[y][tmpIndex] = std::clamp(tmpHumidity, 0.0, double(tmpSaturationValue));
         }
     }
     interpolateMissingValues(humidityMap, SUB_SCALE);
     return humidityMap;
 }
+

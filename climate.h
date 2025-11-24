@@ -10,6 +10,7 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height, 
 std::vector<std::vector<double>> calculateTemperatureMap(int width, int height,
                                                     const std::vector<std::vector<float>>& heightmap);
 
+std::tuple<float, float, float> getWindDirection(float latitudeDeg);
 // Generates a humidity map (0‑30 range) aligned with temperature map.
 std::vector<std::vector<double>> calculateHumidityMap(int width, int height,
                                                     const std::vector<std::vector<double>>& tempMap,
