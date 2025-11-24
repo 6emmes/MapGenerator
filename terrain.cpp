@@ -6,6 +6,7 @@
 #include <string>
 #include <ctime>
 #include <cstdint>
+#include <iostream>
 
 //--- Noise constants ---
 // The following variables are defined with default values.  They
@@ -22,7 +23,7 @@ int initRandSeed() {
     if (SEED != -1) return SEED;
     return static_cast<int>(std::time(nullptr));
 }
-int randSeed = initRandSeed();
+int randSeed = 0;
 
 
 void loadConfig(const std::string &path) {
@@ -60,6 +61,8 @@ void loadConfig(const std::string &path) {
             // ignore malformed integers
         }
     }
+    
+    randSeed = initRandSeed();
 }
 
 
@@ -128,15 +131,13 @@ float fbm(float x, float y) {
     return total;
 }
 
-float MM(float x, float y) {
+float MM(float x, float y, int hetero) {
     float total = 0.0f;
-    float frequency = 2.0f;
-    float amplitude = 2.0f;
-    total = perlin2D(x * frequency, y * frequency) * amplitude;
-    frequency *= 2.0f;
-    amplitude *= PERSISTENCE;
-    for (int i = 1; i < OCTAVES; ++i) {
-        total += std::clamp(total,0.1f,1.0f) * perlin2D(x * frequency, y * frequency) * amplitude;
+    float frequency = 1.0f;
+    float amplitude = 1.0f;
+    for (int i = 0; i < OCTAVES; ++i) {
+        if (i < hetero) total += perlin2D(x * frequency, y * frequency) * amplitude;
+        else total += std::clamp(total,0.5f,1.0f) * perlin2D(x * frequency, y * frequency) * amplitude;
         frequency *= 2.0f;
         amplitude *= PERSISTENCE;
     }
@@ -149,12 +150,15 @@ float simpleMap(float val) {
     const float slope1 = 0.3f;   // can be chosen
     const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
 
-    if (val <= breakpoint) {
-        return slope1 * val;
-    } else {
         float intercept = slope1 * breakpoint;
-        return intercept + slope2 * (val - breakpoint);
-    }
+    float y1 = slope1 * val;
+    float y2 = intercept + slope2 * (val - breakpoint);
+
+    // Logistic blend around breakpoint
+    float sharpness = 20.0f; // higher = sharper transition
+    float t = 1.0f / (1.0f + exp(-sharpness * (val - breakpoint)));
+
+    return (1.0f - t) * y1 + t * y2;
 }
 
 //--- Terrain color mapping ----------------------------------------------------

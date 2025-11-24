@@ -15,6 +15,7 @@ extern int SEED;
 
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f) {
+    std::cout<<"cheby"<<std::endl;
     float cx = x - TEX_W / 2.0f;
     float cy = y - TEX_H / 2.0f;
     float distance = 0.0f;
@@ -40,8 +41,8 @@ std::vector<std::vector<float>> generateHeightMap() {
     } else {
         srand(SEED);
     }
-    int randX = rand()%1000;
-    int randY = rand()%1000;
+    int randX = rand()%1200;
+    int randY = rand()%1200;
     
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
     float maxVal = -1e10f;
@@ -50,9 +51,9 @@ std::vector<std::vector<float>> generateHeightMap() {
         for (int x = 0; x < TEX_W; ++x) {
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
-            float value = MM(nx, ny);
+            float value = MM(nx, ny, 4);
             
-            if (value < 0.f) value = 0.f;
+            //if (value < 0.f) value = 0.f;
             if (value > maxVal) maxVal = value;
             if (value < minVal) minVal = value;
             map[y][x] = value;
@@ -126,49 +127,49 @@ TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& ma
 //  linearly to the full greyscale range.  The resulting texture is
 //  75 % transparent (alpha = 192).
 //--------------------------------------------------------------------------
-TextureData calculateShadingTexture(const TextureData& heightmap) {
-    const int w = heightmap.width;
-    const int h = heightmap.height;
+TextureData calculateShadingTexture(int w, int h, const std::vector<std::vector<float>>& heightmap) {
     TextureData shade;
     shade.width = w;
     shade.height = h;
     shade.pixels.resize(w * h);
 
     const float inv_two = 1.0f / 1.414213562f; // 1/sqrt(2) for top‑left unit vector
-
-    auto getHeight = [&](int x, int y) -> float {
-        // Clamp to borders; we use nearest pixel value at edges.
-        x = std::max(0, std::min(x, w - 1));
-        y = std::max(0, std::min(y, h - 1));
-        uint32_t pixel = heightmap.pixels[y * w + x];
-        uint8_t r = (pixel >> 24) & 0xFF; // red channel as height
-        return static_cast<float>(r);
-    };
-
+    float h_left;
+    float h_right;
+    float h_up;
+    float h_down;
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            float h_left  = getHeight(x - 1, y);
-            float h_right = getHeight(x + 1, y);
-            float h_up    = getHeight(x, y - 1);
-            float h_down  = getHeight(x, y + 1);
+            if (x-1>=0) h_left  = heightmap[x - 1][ y];
+            else h_left = heightmap[x][y];
+            if (x+1<w) h_right = heightmap[x + 1] [y];
+            else h_right = heightmap[x] [y];
+            if (y-1>=0) h_up = heightmap[x][y - 1];
+            else h_up = heightmap[x][y];
+            if (y+1<h) h_down  = heightmap[x][y + 1];
+            else h_down  = heightmap[x][y];
 
             // Central differences
             float gx = h_right - h_left;
             float gy = h_down - h_up;
-            float len = std::sqrt(gx * gx + gy * gy);
-            uint8_t intensity;
-            if (len == 0.0f) {
-                intensity = 128;
-            } else {
-                float nx = gx / len;
-                float ny = gy / len;
-                // Dot with vector pointing to top-left (-1,-1)
-                float dot = -(nx + ny) * inv_two; // cos(theta)
-                // Map [-1,1] to [0,255]
-                intensity = static_cast<uint8_t>(std::clamp((dot + 1.0f) * 127.5f, 0.0f, 255.0f));
-            }
-            const uint8_t alpha = static_cast<uint8_t>(128); // 75% opacity
-            shade.pixels[y * w + x] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
+float nx = -gx;
+float ny = -gy;
+float nz = 0.005f; // vertical component
+float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+nx /= len;
+ny /= len;
+nz /= len;
+
+// Example light vector pointing diagonally down-left
+float lx = -1.0f, ly = -1.0f, lz = 1.0f;
+float llen = std::sqrt(lx*lx + ly*ly + lz*lz);
+lx /= llen; ly /= llen; lz /= llen;
+
+float dot = nx*lx + ny*ly + nz*lz;
+dot = std::clamp(dot, -1.0f, 1.0f);
+uint8_t intensity = static_cast<uint8_t>((dot + 1.0f) * 127.5f);
+            const uint8_t alpha = static_cast<uint8_t>(64); // 75% opacity
+            shade.pixels[x * w + y] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
         }
     }
     return shade;
@@ -199,7 +200,7 @@ TextureData climateTexture(const std::vector<std::vector<double>>& tempMap,
             double hum = humidityMap[y][x];
             b = static_cast<uint8_t>(std::clamp((hum) / 30.0 * 255.0, 0.0, 255.0));
 
-            uint32_t pixel = (0 << 24) | (0 << 16) | (b << 8) | 0xFF;
+            uint32_t pixel = (r << 24) | (0 << 16) | (b << 8) | 0xFF;
             data.pixels[y * data.width + x] = pixel;
         }
     }

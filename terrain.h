@@ -32,6 +32,6 @@ extern const float GRADIENTS[8][2];
 // --- Functions ----------------------------------------------------------
 float perlin2D(float x, float y);
 float fbm(float x, float y);
-float MM(float x, float y);
+float MM(float x, float y, int hetero);
 float simpleMap(float val);
 Color getTerrainPixel(float height);

@@ -44,6 +44,7 @@ static bool g_showRiverTex = true;
 
 static int Init()
 {   
+    loadConfig("mapgen.conf");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_Log("SDL_Init() Error: %s", SDL_GetError());
         return -1;
@@ -70,7 +71,6 @@ static int Init()
     // Create texture from gradient pixels
     // Generate height map, then convert to texture for rendering
     // Load rendering configuration from file before generating map
-    loadConfig("mapgen.conf");
     auto heightMap = generateHeightMap();
     // Save height map to PNG and BMP for debugging.
     if (!saveHeightMapBMP(heightMap, "heightmap.bmp")) {
@@ -91,8 +91,6 @@ static int Init()
     }
     SDL_SetTextureBlendMode(riverTex, SDL_BLENDMODE_BLEND);
     auto texData = textureFromHeightMap(heightMap);
-    // Generate a separate height texture for shading calculations
-    auto heightTexData = heightTextureFromHeightMap(heightMap);
     rect.w = texData.width;
     rect.h = texData.height;
     terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, texData.width, texData.height);
@@ -125,7 +123,7 @@ static int Init()
     SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
 
     // Calculate shading texture based on height texture
-    TextureData shadingData = calculateShadingTexture(heightTexData);
+    TextureData shadingData = calculateShadingTexture(TEX_W, TEX_H, heightMap);
     shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, shadingData.width, shadingData.height);
     SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
     if (!shadingTex) {
