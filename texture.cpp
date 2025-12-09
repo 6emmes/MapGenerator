@@ -85,7 +85,7 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
     
     int changed = 0;
     float value;
-    float step = 0.003;//float(1/TEX_H);
+    float step = 0.001;//float(1/TEX_H);
     for (int y = 0; y < TEX_H; ++y) {   //poziomo
         for (int x = 1; x < TEX_W; ++x) {
             value = water[y][x];
@@ -353,13 +353,14 @@ TextureData idTexture(const std::vector<std::vector<float>>& waterMap) {
     return data;
 }
 
-void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std::vector<float>>& data, bool targetColor, int fillColor, Point start){
+void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std::vector<float>>& data, bool targetColor, float fillColor, Point start){
     std::stack<Point> seed_stack;
     Point current_pos = start;
     seed_stack.push(current_pos);
     int left, right;
     int cur_y;
     int topflag, botflag;
+    float delta;
     while (seed_stack.size()>0){
         current_pos = seed_stack.top();
         seed_stack.pop();
@@ -369,12 +370,12 @@ void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std:
         while (left > 0 && checkCondition(waterMap[cur_y][left],targetColor)) left -=1;
         right = current_pos.x;
         while (right < TEX_W && checkCondition(waterMap[cur_y][right],targetColor)) right +=1;
-        //std::cout<<left<<"_"<<right<<std::endl;
         topflag = 0;
         botflag = 0;
         for (int i=left; i<right; i++){
             data[cur_y][i] = fillColor;
             if (cur_y<TEX_H-1){
+                //delta = data[(cur_y+1)][i] - fillColor;
                 if (checkCondition(waterMap[cur_y+1][i], targetColor) && data[(cur_y+1)][i] != fillColor){
                     if (botflag==0) {
                         seed_stack.push({i, cur_y+1});
@@ -383,10 +384,10 @@ void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std:
                 }
                 else {
                     botflag = 0;
-                    //std::cout<<i<<std::endl;
                 }
             }
              if (cur_y>0){
+                //delta = data[(cur_y-1)][ i] - fillColor;
                 if (checkCondition(waterMap[cur_y-1][i], targetColor) && data[(cur_y-1)][ i] != fillColor){
                     if (topflag==0) {
                         seed_stack.push({i, cur_y-1});
@@ -395,7 +396,6 @@ void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std:
                 }
                 else {
                     topflag = 0;
-                    //std::cout<<i<<std::endl;
                 }
             }
         }
@@ -406,16 +406,16 @@ void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std:
 
 std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& waterMap) {
     std::vector<std::vector<float>> data(TEX_H, std::vector<float>(TEX_W, 0.0));
-    uint8_t gray = 1;
-    int a =0;
-    int fillvalue;
+    int gray = 1;
+    float fillvalue;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             float v = waterMap[y][x];
-            if (data[y][x] == 0){
-                if (v==0) fillvalue = gray;
-                else fillvalue = ((255-gray) << 24) | ((255-gray) << 16) | ((255-gray) << 8) | 255;
+            if (data[y][x] == 0.0){
+                if (v==0) fillvalue = float(gray)/256;
+                else fillvalue = float(255-gray)/256;
                 gray++;
+                if (gray > 120) throw std::domain_error("Too many terrain islands");
                 fillValue(waterMap, data, v==0, fillvalue, {x,y});
             }
         }

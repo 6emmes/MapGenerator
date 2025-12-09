@@ -60,6 +60,8 @@
         "ratio": "cpp",
         "sstream": "cpp",
         "queue": "cpp",
-        "deque": "cpp"
-    }
+        "deque": "cpp",
+        "stack": "cpp"
+    },
+    "cmake.sourceDirectory": "D:/MyDoc/Documents/Studia_2025Z/Projekt_badawczy/Kod/MapGenerator/libtiff"
 }

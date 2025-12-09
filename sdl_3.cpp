@@ -62,18 +62,21 @@ void initMapTextures(){
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
     std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
+    std::vector<std::vector<float>> idMap = idData(waterMap);
     
     isNormal(heightMap);
     isNormal(riverData);
     isNormal(tempMap);
     isNormal(humidityMap);
     isNormal(waterMap);
+    isNormal(idMap);
 
     data.push_back(&heightMap);
     data.push_back(&riverData);
     data.push_back(&tempMap);
     data.push_back(&humidityMap);
     data.push_back(&waterMap);
+    data.push_back(&idMap);
 
     std::vector<std::string> layerNames;
     layerNames.push_back("height_map");
@@ -81,6 +84,7 @@ void initMapTextures(){
     layerNames.push_back("temp_map");
     layerNames.push_back("humidity_map");
     layerNames.push_back("water_map");
+    layerNames.push_back("id_map");
 
     saveTiff(data, layerNames, "NowaMapa.tiff");
 
@@ -188,7 +192,6 @@ static void Render()
     }
     if (g_showWaterTex && waterTex) {
         SDL_RenderTexture(renderer, waterTex, NULL, &dst);
-    }
     }
     SDL_RenderPresent(renderer);
 }
