@@ -3,9 +3,11 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <string>
 #include <iostream>
 #include "texture.h"
 #include "terrain.h"
+
 #include "climate.h"
 
 // A simple movable rectangle.
@@ -21,44 +23,83 @@ struct Rect
 static SDL_Window *window = nullptr;
 static SDL_Renderer *renderer = nullptr;
 // Texture representing the terrain surface. Renamed from rectTex for clarity
-static SDL_Texture *terrainTex = nullptr; // texture for terrain
 static Rect rect;
-// 
-// Shading texture overlay
-static SDL_Texture *shadingTex = nullptr; // shading texture
-// Climate texture overlay (red channel temperature)
+//
+static SDL_Texture *terrainTex = nullptr;
+static SDL_Texture *shadingTex = nullptr;
 static SDL_Texture *climateTex = nullptr;
 static SDL_Texture *riverTex = nullptr;
+static SDL_Texture *waterTex = nullptr;
 // Flags to enable/disable rendering of textures
 static bool g_showTerrainTex = true;
 static bool g_showShadingTex = false;
 static bool g_showClimateTex = false;
 static bool g_showRiverTex = true;
+static bool g_showWaterTex = false;
     // Flags already defined above at file scope
 
+void isNormal(std::vector<std::vector<float>> input){
+    for (int x=0;x<input.size();x++){
+        for(int y=0;y<input[0].size();y++){
+            if (input[x][y]>1 || input[x][y]<0) {
+                std::cout<<"NOT NORMAL "<<input[x][y]<<std::endl;
+                return;
+            }
+        }
+    }
+    std::cout<<"NORMAL"<<std::endl;
+
+}
 
 void initMapTextures(){
     loadConfig("mapgen.conf");
+    
+    std::vector<std::vector<std::vector<float>>*> data;
 
-    std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> heighTuple = generateHeightMap();
+    std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> heighTuple = generateHeightMap();
     std::vector<std::vector<float>> heightMap = std::get<0>(heighTuple);
-    std::vector<std::vector<bool>> landMap = std::get<1>(heighTuple);
-    std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, landMap);
+    std::vector<std::vector<float>> waterMap = std::get<1>(heighTuple);
+    std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
     std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
+    
+    isNormal(heightMap);
+    isNormal(riverData);
+    isNormal(tempMap);
+    isNormal(humidityMap);
+    isNormal(waterMap);
 
-    TextureData texData = textureFromHeightMap(heightMap);
+    data.push_back(&heightMap);
+    data.push_back(&riverData);
+    data.push_back(&tempMap);
+    data.push_back(&humidityMap);
+    data.push_back(&waterMap);
+
+    std::vector<std::string> layerNames;
+    layerNames.push_back("height_map");
+    layerNames.push_back("river_map");
+    layerNames.push_back("temp_map");
+    layerNames.push_back("humidity_map");
+    layerNames.push_back("water_map");
+
+    saveTiff(data, layerNames, "NowaMapa.tiff");
+
+    TextureData texData = heightTexture(heightMap);
     TextureData riverTexData = riverTexture(riverData);
     TextureData climateData = climateTexture(tempMap, humidityMap);
-    TextureData shadingData = calculateShadingTexture(TEX_W, TEX_H, heightMap, landMap);
+    TextureData shadingData = shadingTexture(TEX_W, TEX_H, heightMap, waterMap);
+    TextureData waterData = waterTexture(waterMap);
     
+
     terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
     riverTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
     climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    waterTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
     shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
 
     SDL_UpdateTexture(terrainTex, NULL, texData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(riverTex, NULL, riverTexData.pixels.data(), TEX_W * 4);
+    SDL_UpdateTexture(waterTex, NULL, waterData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(shadingTex, NULL, shadingData.pixels.data(), TEX_W * 4);
 
@@ -70,6 +111,10 @@ void initMapTextures(){
 
     SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);
     SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
+
+
+    SDL_SetTextureScaleMode(waterTex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureBlendMode(waterTex, SDL_BLENDMODE_BLEND);
 
     SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
     SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
@@ -131,17 +176,19 @@ static void Render()
         SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
         SDL_RenderTexture(renderer, terrainTex, NULL, &dst);
     }
-    if (g_showRiverTex && riverTex) {
-        SDL_RenderTexture(renderer, riverTex, NULL, &dst);
-    }
-    // Overlay climate texture on top of shading, if enabled
-    if (g_showClimateTex && climateTex) {
-        SDL_RenderTexture(renderer, climateTex, NULL, &dst);
-    }
-
     // Overlay shading texture on top of rectangle, if enabled
     if (g_showShadingTex && shadingTex) {
         SDL_RenderTexture(renderer, shadingTex, NULL, &dst);
+    }
+    if (g_showRiverTex && riverTex) {
+        SDL_RenderTexture(renderer, riverTex, NULL, &dst);
+    }
+    if (g_showClimateTex && climateTex) {
+        SDL_RenderTexture(renderer, climateTex, NULL, &dst);
+    }
+    if (g_showWaterTex && waterTex) {
+        SDL_RenderTexture(renderer, waterTex, NULL, &dst);
+    }
     }
     SDL_RenderPresent(renderer);
 }
@@ -188,6 +235,7 @@ int main(int argc, char *argv[])
                     {SDL_SCANCODE_2, &g_showShadingTex},
                     {SDL_SCANCODE_3, &g_showClimateTex},
                     {SDL_SCANCODE_4, &g_showRiverTex},
+                    {SDL_SCANCODE_5, &g_showWaterTex},
                 };
                 for (const auto &t : toggles) {
                 if (event.key.scancode == t.scancode) {

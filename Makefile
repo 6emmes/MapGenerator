@@ -2,11 +2,12 @@
 # Requires SDL3 installed under /usr/local.
 
 CC = g++
-CFLAGS = -I/usr/local/include/SDL3
-LDFLAGS = -L/usr/local/lib -lSDL3
+# Add libtiff include and library path
+CFLAGS = -I/usr/local/include/SDL3 -I../tiff-4.5.0/libtiff
+LDFLAGS = -L/usr/local/lib -L../tiff_build/libtiff -lSDL3 -ltiff
 
 TARGETS = sdl_3
-SRCS = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp climate.cpp
+SRCS = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp climate.cpp tiff_write.cpp
 
 all: $(TARGETS)
 

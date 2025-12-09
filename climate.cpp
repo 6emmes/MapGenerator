@@ -100,8 +100,8 @@ bool outOfBounds(int x, int y, int width, int height, int margin=0) {
     return (x < margin || x >= width - margin || y < margin || y >= height - margin);
 }
 
-int createRiver(int width, int height, const std::pair<int,int> &originPoint, std::vector<std::vector<float>> &riverMap,
-    std::vector<std::vector<float>> &heightmap, std::vector<std::vector<bool>> &landMap) {
+std::pair<int, float> createRiver(int width, int height, const std::pair<int,int> &originPoint, std::vector<std::vector<float>> &riverMap,
+    std::vector<std::vector<float>> &heightmap, std::vector<std::vector<float>> &waterMap) {
     std::pair<int,int> nextstep;
     std::pair<int,int> currentPoint = originPoint;
     std::vector<std::pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};
@@ -134,7 +134,7 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             if (riverMap[currentPoint.second + j][currentPoint.first + i] > 0.2 && 
                 (currentPoint.second + j!=originPoint.second || currentPoint.first + i!=originPoint.first)) {
                 //std::cout << "River killed" << std::endl;
-                return 0;
+                return {0,0};
             }
         }
     }
@@ -156,10 +156,10 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
                 i = 0;
                 loopStart = minHeightPoint;
             }
-            else return 0;
+            else return {0,0};
         }
         if (tmpPathFrontier.size() == 0) {
-            return 0;
+            return {0,0};
         }
         currentPoint = tmpPathFrontier.front();
         tmpPathFrontier.pop();
@@ -168,7 +168,7 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             curheight += curheight/200;
             minHeightPoint = currentPoint;
         }
-        if (landMap[currentPoint.second][currentPoint.first] == false) {
+        if (waterMap[currentPoint.second][currentPoint.first] == 0) {
             break;
         }
         if (outOfBounds(currentPoint.second, currentPoint.first, width, height, 1)) continue;
@@ -205,8 +205,9 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
     value = 0.02;
     int tmpPathSize = tmpPath.size();
     int riverFound = 0;
+    float riverHash = 0;
     //=====================================================================Saving the path to the map
-    std::cout  << "River length: "<< tmpPathSize <<"/"<<riverlen<<std::endl;
+    //std::cout  << "River length: "<< tmpPathSize <<"/"<<riverlen<<std::endl;
     for (int j=0;j<tmpPathSize;j++) {
         currentPoint = tmpPath.top();
         tmpPath.pop();
@@ -216,41 +217,15 @@ int createRiver(int width, int height, const std::pair<int,int> &originPoint, st
             break;
         }
         else riverMap[currentPoint.second][currentPoint.first] = value;
+        riverHash += value;
         value += delta;
     }
-        return 1;
-    if (riverFound){
-        value = 1;
-        float currentValue = riverMap[currentPoint.second][currentPoint.first];
-        riverMap[currentPoint.second][currentPoint.first] +=value;
-        for (int i =0;i<10;i++){
-            riverFound = 0;
-            nextstep = currentPoint;
-            for (const auto& d : directions) {
-                if (riverMap[currentPoint.second + d.second][currentPoint.first + d.first] > currentValue && tmpMap[currentPoint.second + d.second][currentPoint.first + d.first]>0){
-                    if  (tmpMap[currentPoint.second + d.second][currentPoint.first + d.first] > tmpMap[nextstep.second][nextstep.first]) {
-                        nextstep.first = currentPoint.first + d.first;
-                        nextstep.second = currentPoint.second + d.second;
-                    }
-
-                }
-            }
-            std::cout << "a"<<std::endl;
-            riverMap[nextstep.second][nextstep.first] = value;
-            std::cout << "b"<<std::endl; 
-            currentPoint.first = nextstep.first;
-            currentPoint.second = nextstep.second;
-            float currentValue = tmpMap[currentPoint.second][currentPoint.first];
-            if (riverFound==0) break;
-
-        }
-    }
-    return 1;
+    return {1, riverHash};
 }
 
 std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     std::vector<std::vector<float>> &heightmap,
-    std::vector<std::vector<bool>> &landMap) {
+    std::vector<std::vector<float>> &landMap) {
     std::vector<std::vector<float>> riverMap(height, std::vector<float>(width, 0.0f));
     //std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
     std::mt19937 rng(3);
@@ -270,13 +245,16 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
         }
     }
     int riversmade = 0;
-    int a=0;    //debug
+    std::pair<int, float> tmp;
+    int riverHash = 0;
     for (const auto &p : points) {
-        riversmade += createRiver(width, height, p, riverMap, heightmap, landMap);
+        tmp = createRiver(width, height, p, riverMap, heightmap, landMap);
+        riversmade += tmp.first;
+        riverHash += int(tmp.second*100);
         //break;
     }
     std::cout << "Generated " << riversmade <<" rivers out of "<< points.size() << " starting river points in " << RIVER_COUNT << " attempts.\n";
-    std::cout << "River map generation complete.\n";
+    std::cout <<"River hash: "<< riverHash <<std::endl;
     return riverMap;
 }
 
@@ -293,7 +271,7 @@ double saturatedAbsoluteHumidity(double temperatureK) {
     const double T2  = 35.86;     // Tetens constant
     const double b   = 7.5;       // Tetens b coefficient (typical value)
     const double R   = 0.000461;  // Specific gas constant (kPa·kmol/(K·kg))
-
+    temperatureK = temperatureK*60+260;
     double e = e0 * std::exp(b * (temperatureK - T1) / (temperatureK - T2));
     return e / (R * temperatureK); // kg/m^3
 }
@@ -303,24 +281,19 @@ double saturatedAbsoluteHumidity(double temperatureK) {
 
 // Compute incoming solar energy from latitude in degrees
 static inline double incomingSolarEnergy(double latitudeDeg) {
+    double POLARPOWER = 180;   //  W/m2
+    double EQUATORPOWER = 311; //  W/m2
     const double deg2rad = 3.14159265358979323846 / 180.0;
-    return (420.0 - 175.0) + 175.0 * std::cos(latitudeDeg * deg2rad);
+    return POLARPOWER + (EQUATORPOWER - POLARPOWER) * std::cos(latitudeDeg * deg2rad);
 }
 
-// Generate a temperature map using thermal equilibrium based on the
-// incoming solar energy.  The returned values are in kilo‑kelvins.
-// Formula:
-//   Te = (power*1000 / STEFAN)^(1/4)
-//   Temperature = Te * (2/(2 - ε))^(1/4)
-//   Result divided by 1000.
-//   ε = 0.89, STEFAN = 5.67e-8.
-// Heightmap values range from 0.0 (~sea level) to 1.0 (~max altitude).
-// Uses a standard lapse rate (6.5°C per km) to adjust temperature.
+// Temperature in 260 - 320 kelvin range
 std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
                                                             const std::vector<std::vector<float>>& heightmap) {
     // Constants
     constexpr float STEFAN = 5.67e-8;
-    constexpr float EPSILON = 0.89;
+    constexpr float EPSILON = 0.93;
+    constexpr float GREENHOUSEFACTOR = 0.4;
     static bool loaded = false;
     if (!loaded) {
         loadclimateconfig("mapgen.conf");
@@ -332,8 +305,11 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
     for (int y = 0; y < height; ++y) {
         float lat = LAT_BOTTOM + latDelta * float(y);
         float power = incomingSolarEnergy(lat); // W/m^2
-        float Te = std::pow((power) / STEFAN, 0.25);
-        float baseTemperatureK = Te * std::pow(2.0 / (2.0 - EPSILON), 0.25); // Kelvin
+        float baseTemperatureK = power / (EPSILON / (1+GREENHOUSEFACTOR));
+        baseTemperatureK = baseTemperatureK / STEFAN;
+        baseTemperatureK = std::pow(baseTemperatureK,0.25);
+        // float Te = std::pow((power) / STEFAN, 0.25);
+        // float baseTemperatureK = Te * std::pow(2.0 / (2.0 - EPSILON), 0.25); // Kelvin
         for (int x = 0; x < width; ++x) {
             float altitudeMeters = 0.0;
             if (y < static_cast<int>(heightmap.size()) &&
@@ -342,7 +318,7 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
             }
             float tempShiftK = 6.5 * (altitudeMeters / 1000.0); // K
             float tempK = baseTemperatureK - tempShiftK;
-            tempMap[y][x] = tempK;
+            tempMap[y][x] = (tempK-260)/60;
             if (tempK > maxtemp) maxtemp = tempK; // debug
         }
     }

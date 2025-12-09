@@ -6,6 +6,8 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <stack>
+#include <tuple>
 #include <cstdlib>
 #include <time.h>
 #include <iostream> //debug
@@ -13,6 +15,10 @@
 // Expose seed variable defined in terrain.cpp
 extern int SEED;
 
+struct Point {
+    int x;
+    int y;
+};
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f) {
     std::cout<<"cheby"<<std::endl;
@@ -34,7 +40,7 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f) {
 }
 
 
-std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> generateHeightMap() {
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> generateHeightMap() {
     // Seed for reproducibility using SEED from config; if SEED is -1 use current time
     if (SEED == -1) {
         srand(time(NULL));
@@ -43,9 +49,10 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> gene
     }
     int randX = rand()%1200;
     int randY = rand()%1200;
-    
+    long long hash = 0;
+    std::vector<std::pair<int,int>> directions = { {0,1}, {0,-1}};   //{1,0}, {-1,0},
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
-    std::vector<std::vector<bool>> land(TEX_H, std::vector<bool>(TEX_W, true));
+    std::vector<std::vector<float>> water(TEX_H, std::vector<float>(TEX_W, 1024.0));
     float maxVal = -1e10f;
     float minVal = 1e10f;
     for (int y = 0; y < TEX_H; ++y) {
@@ -60,22 +67,55 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<bool>>> gene
             map[y][x] = value;
         }
     }
+    float norm;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             // Normalize to [0,1] based on min/max found
-            float norm = map[y][x];
+            norm = map[y][x];
             norm = (norm - minVal) / (maxVal - minVal);
             //norm = norm - 1.5 * Chebyshev(x, y, 0.7);
             norm = simpleMap(norm);
+            if (norm < 0) norm=0;
+            if (norm > 1) norm=1;
             map[y][x] = norm;
-            if (norm<0.1) land[y][x] = false;
+            hash += int(norm*100);
+            if (norm<0.1) water[y][x] = 0.0;
         }
     }
-    return {map,land};
+    
+    int changed = 0;
+    float value;
+    float step = 0.003;//float(1/TEX_H);
+    for (int y = 0; y < TEX_H; ++y) {   //poziomo
+        for (int x = 1; x < TEX_W; ++x) {
+            value = water[y][x];
+            if (value == 0) continue;
+            if (water[y][x-1]+step<water[y][x]) water[y][x] = water[y][x-1]+step;
+        }
+        for (int x = TEX_W-2; x >=0; x--) {
+            value = water[y][x];
+            if (value == 0) continue;
+            if (water[y][x+1]+step<water[y][x]) water[y][x] = water[y][x+1]+step;
+        }
+    }
+    for (int x = 0; x < TEX_W; ++x) {   //poinowo
+        for (int y = 1; y < TEX_H; ++y) {
+            value = water[y][x];
+            if (value == 0) continue;
+            if (water[y-1][x]+step<water[y][x]) water[y][x] = water[y-1][x]+step;
+        }
+        for (int y = TEX_H-2; y >=0; y--) {
+            value = water[y][x];
+            if (value == 0) continue;
+            if (water[y+1][x]+step<water[y][x]) water[y][x] = water[y+1][x]+step;
+        }
+    }
+    std::cout <<"Heightmap hash: "<< hash <<std::endl;
+    return {map,water};
 }
 
 // Convert a height map to a color texture using getTerrainPixel.
-TextureData textureFromHeightMap(const std::vector<std::vector<float>>& map) {
+TextureData heightTexture(const std::vector<std::vector<float>>& map) {
     TextureData data;
     data.width = TEX_W;
     data.height = TEX_H;
@@ -114,23 +154,8 @@ TextureData heightTextureFromHeightMap(const std::vector<std::vector<float>>& ma
     return data;
 }
 
-//---------------------------------------------------------------------------
-//  calculateShadingTexture
-//  Generates a greyscale shading texture based on height variations
-//  in the supplied heightmap.  The heightmap must be the output of
-//  `generateTextureRGBA`, where each pixel's red channel encodes the
-//  height.  For each pixel we look at its four orthogonal
-//  neighbours (up, down, left, right) to compute a central‑difference
-//  gradient.  The gradient direction is compared to the unit vector
-//  pointing toward the top‑left corner.
-//  Pixels where the gradient points toward the top‑left are made
-//  white (intensity 255); where it points toward the bottom‑right
-//  they are dark (intensity 0).  Intermediate directions are mapped
-//  linearly to the full greyscale range.  The resulting texture is
-//  75 % transparent (alpha = 192).
-//--------------------------------------------------------------------------
-TextureData calculateShadingTexture(int w, int h, const std::vector<std::vector<float>>& heightmap,
-    std::vector<std::vector<bool>> landMap) {
+TextureData shadingTexture(int w, int h, const std::vector<std::vector<float>>& heightmap,
+    std::vector<std::vector<float>> landMap) {
     TextureData shade;
     shade.width = w;
     shade.height = h;
@@ -143,7 +168,7 @@ TextureData calculateShadingTexture(int w, int h, const std::vector<std::vector<
     float h_down;
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            if (landMap[x][y] == false){
+            if (landMap[x][y] == 0){
                 shade.pixels[x * w + y] = (0 << 24) | (0 << 16) | (0 << 8) | 0;
                 continue;
             }
@@ -225,6 +250,174 @@ TextureData riverTexture(const std::vector<std::vector<float>>& riverMap) {
             uint8_t val = static_cast<uint8_t>(std::clamp(v * 255.f, 0.f, 255.f));
             uint32_t pixel = (0 << 24) | (0 << 16) | (val << 8) | val;
             data.pixels[y * TEX_W + x] = pixel;
+        }
+    }
+    return data;
+}
+
+
+TextureData waterTexture(const std::vector<std::vector<float>>& waterMap) {
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float v = waterMap[y][x];
+            uint8_t val = static_cast<uint8_t>(std::clamp(v * 255.f, 0.f, 255.f));
+            uint32_t pixel = (0 << 24) | (0 << 16) | (val << 8) | val;
+            data.pixels[y * TEX_W + x] = pixel;
+        }
+    }
+    return data;
+}
+
+
+bool checkCondition(float var, bool checkEqual) {
+    if (checkEqual) {
+        return var == 0;
+    } else {
+        return var != 0;
+    }
+}
+
+void fillTexture(const std::vector<std::vector<float>>& waterMap, TextureData& texture, bool targetColor, int fillColor, Point start){
+    std::stack<Point> seed_stack;
+    Point current_pos = start;
+    seed_stack.push(current_pos);
+    int left, right;
+    int cur_y;
+    int topflag, botflag;
+    while (seed_stack.size()>0){
+        current_pos = seed_stack.top();
+        seed_stack.pop();
+        cur_y = current_pos.y;
+        if (cur_y >= TEX_H || cur_y < 0) continue;
+        left = current_pos.x;
+        while (left > 0 && checkCondition(waterMap[cur_y][left],targetColor)) left -=1;
+        right = current_pos.x;
+        while (right < TEX_W && checkCondition(waterMap[cur_y][right],targetColor)) right +=1;
+        //std::cout<<left<<"_"<<right<<std::endl;
+        topflag = 0;
+        botflag = 0;
+        for (int i=left; i<right; i++){
+            texture.pixels[cur_y * TEX_W + i] = fillColor;
+            if (cur_y<TEX_H-1){
+                if (checkCondition(waterMap[cur_y+1][i], targetColor) && texture.pixels[(cur_y+1) * TEX_W + i] != fillColor){
+                    if (botflag==0) {
+                        seed_stack.push({i, cur_y+1});
+                        botflag = 1;
+                    }
+                }
+                else {
+                    botflag = 0;
+                    //std::cout<<i<<std::endl;
+                }
+            }
+             if (cur_y>0){
+                if (checkCondition(waterMap[cur_y-1][i], targetColor) && texture.pixels[(cur_y-1) * TEX_W + i] != fillColor){
+                    if (topflag==0) {
+                        seed_stack.push({i, cur_y-1});
+                        topflag = 1;
+                    }
+                }
+                else {
+                    topflag = 0;
+                    //std::cout<<i<<std::endl;
+                }
+            }
+        }
+
+    }
+}
+
+TextureData idTexture(const std::vector<std::vector<float>>& waterMap) {
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    uint8_t gray = 1;
+    int a =0;
+    int fillcolor;
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float v = waterMap[y][x];
+            if (data.pixels[y * TEX_W + x] == 0){
+                if (v==0) fillcolor = (gray << 24) | (gray << 16) | (gray << 8) | 255;
+                else fillcolor = ((255-gray) << 24) | ((255-gray) << 16) | ((255-gray) << 8) | 255;
+                gray++;
+                fillTexture(waterMap, data, v==0, fillcolor, {x,y});
+            }
+        }
+    }
+    return data;
+}
+
+void fillValue(const std::vector<std::vector<float>>& waterMap, std::vector<std::vector<float>>& data, bool targetColor, int fillColor, Point start){
+    std::stack<Point> seed_stack;
+    Point current_pos = start;
+    seed_stack.push(current_pos);
+    int left, right;
+    int cur_y;
+    int topflag, botflag;
+    while (seed_stack.size()>0){
+        current_pos = seed_stack.top();
+        seed_stack.pop();
+        cur_y = current_pos.y;
+        if (cur_y >= TEX_H || cur_y < 0) continue;
+        left = current_pos.x;
+        while (left > 0 && checkCondition(waterMap[cur_y][left],targetColor)) left -=1;
+        right = current_pos.x;
+        while (right < TEX_W && checkCondition(waterMap[cur_y][right],targetColor)) right +=1;
+        //std::cout<<left<<"_"<<right<<std::endl;
+        topflag = 0;
+        botflag = 0;
+        for (int i=left; i<right; i++){
+            data[cur_y][i] = fillColor;
+            if (cur_y<TEX_H-1){
+                if (checkCondition(waterMap[cur_y+1][i], targetColor) && data[(cur_y+1)][i] != fillColor){
+                    if (botflag==0) {
+                        seed_stack.push({i, cur_y+1});
+                        botflag = 1;
+                    }
+                }
+                else {
+                    botflag = 0;
+                    //std::cout<<i<<std::endl;
+                }
+            }
+             if (cur_y>0){
+                if (checkCondition(waterMap[cur_y-1][i], targetColor) && data[(cur_y-1)][ i] != fillColor){
+                    if (topflag==0) {
+                        seed_stack.push({i, cur_y-1});
+                        topflag = 1;
+                    }
+                }
+                else {
+                    topflag = 0;
+                    //std::cout<<i<<std::endl;
+                }
+            }
+        }
+
+    }
+}
+
+
+std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& waterMap) {
+    std::vector<std::vector<float>> data(TEX_H, std::vector<float>(TEX_W, 0.0));
+    uint8_t gray = 1;
+    int a =0;
+    int fillvalue;
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            float v = waterMap[y][x];
+            if (data[y][x] == 0){
+                if (v==0) fillvalue = gray;
+                else fillvalue = ((255-gray) << 24) | ((255-gray) << 16) | ((255-gray) << 8) | 255;
+                gray++;
+                fillValue(waterMap, data, v==0, fillvalue, {x,y});
+            }
         }
     }
     return data;

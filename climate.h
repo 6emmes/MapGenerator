@@ -4,7 +4,7 @@
 
 // Generates river map by marking points in the height map.
 // Returns a reference to the modified height map.
-std::vector<std::vector<float>> generateRiverPoints_main(int width, int height, std::vector<std::vector<float>>& heightmap, std::vector<std::vector<bool>> &landMap);
+std::vector<std::vector<float>> generateRiverPoints_main(int width, int height, std::vector<std::vector<float>>& heightmap, std::vector<std::vector<float>> &landMap);
 // Generates a temperature map in kilo‑Kelvin.
 std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
                                                     const std::vector<std::vector<float>>& heightmap);
