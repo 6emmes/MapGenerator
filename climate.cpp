@@ -308,8 +308,6 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
         float baseTemperatureK = power / (EPSILON / (1+GREENHOUSEFACTOR));
         baseTemperatureK = baseTemperatureK / STEFAN;
         baseTemperatureK = std::pow(baseTemperatureK,0.25);
-        // float Te = std::pow((power) / STEFAN, 0.25);
-        // float baseTemperatureK = Te * std::pow(2.0 / (2.0 - EPSILON), 0.25); // Kelvin
         for (int x = 0; x < width; ++x) {
             float altitudeMeters = 0.0;
             if (y < static_cast<int>(heightmap.size()) &&
@@ -442,5 +440,49 @@ std::vector<std::vector<float>> calculateHumidityMap(
     }
     interpolateMissingValues(humidityMap, SUB_SCALE);
     return humidityMap;
+}
+
+//White, Mottershead and Harrison Net Primary Productivity formula for rainfall
+float WMH_humidity(float humidity){
+    float CONST_A = 2909;
+    float CONST_B = -0.000688;
+    float out;
+    out = 1-exp(CONST_B  * humidity);
+    out = out * CONST_A;
+    return out;
+}
+
+//White, Mottershead and Harrison Net Primary Productivity formula for temperature
+float WMH_temperature(float temperature){
+    float CONST_A = 2914;
+    float CONST_B = -0.128;
+    float CONST_C = 3.64;
+    float out;
+    out = 1 + CONST_C * exp(CONST_B  * temperature);
+    out = CONST_A / out;
+    return out;
+}
+
+std::vector<std::vector<float>> fertilityMap(
+    std::vector<std::vector<float>> tempMap, 
+    std::vector<std::vector<float>> humidityMap, 
+    std::vector<std::vector<float>> riverMap) {
+    
+    std::vector<std::vector<float>> fert;
+    int width = tempMap.size();
+    int height = tempMap[0].size();
+    if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
+        std::cerr << "Error: width and height must be multiples of "
+                << SUB_SCALE << std::endl;
+        return humidityMap; // early exit with zeros
+    }
+    fert.resize(width, std::vector<float>(height, 0.0f));
+    for (int x = 0; x < width; x += SUB_SCALE) {
+        for (int y = 0; y < height; y += SUB_SCALE) {
+            fert[x][y] = WMH_temperature(tempMap[x][y]);
+        }
+    }
+    interpolateMissingValues(fert, SUB_SCALE);
+    return fert;
 }
 

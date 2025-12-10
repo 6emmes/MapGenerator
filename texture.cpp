@@ -225,7 +225,7 @@ TextureData climateTexture(const std::vector<std::vector<float>>& tempMap,
         for (int x = 0; x < data.width; ++x) {
             float tempK = tempMap[y][x];
             // Temperature red channel: map 280K (~7°C) to 0 and 320K (~47°C) to 255.
-            uint8_t r = static_cast<uint8_t>(std::clamp((tempK - 280.0) / 40.0 * 255.0, 0.0, 255.0));
+            uint8_t r = static_cast<uint8_t>(std::clamp(tempK * 255.0, 0.0, 255.0));
 
             // Humidity blue channel: Scale 0-30 to 0-255.
             uint8_t b = 0;
@@ -270,6 +270,23 @@ TextureData waterTexture(const std::vector<std::vector<float>>& waterMap) {
         }
     }
     return data;
+}
+
+
+std::vector<std::vector<float>> metalDensity() {
+    std::vector<std::vector<float>> density(TEX_H, std::vector<float>(TEX_W));
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            // Scale coordinates to control frequency.
+            float nx = static_cast<float>(x) * NOISE_SCALE;
+            float ny = static_cast<float>(y) * NOISE_SCALE;
+            float v = (fbm(nx, ny)- 0.25) *0.571;
+            // Clamp into 0‑1.  The fbm range is roughly [-2,2] for
+            // the current settings, so clamping keeps it stable.
+            density[y][x] = std::clamp(v, 0.0f, 1.0f);
+        }
+    }
+    return density;
 }
 
 
