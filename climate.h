@@ -20,3 +20,8 @@ int getSubscale();
 // Computes saturated absolute humidity (kg/m^3) from temperature in Kelvin.
 double saturatedAbsoluteHumidity(double temperatureKelvin);
 void interpolateMissingValues(std::vector<std::vector<double>>& grid, int subScale);
+std::vector<std::vector<float>> calculateFertilityMap(
+    std::vector<std::vector<float>>& tempMap, 
+    std::vector<std::vector<float>>& humidityMap, 
+    std::vector<std::vector<float>>& riverMap);
+

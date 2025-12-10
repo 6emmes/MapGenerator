@@ -463,14 +463,21 @@ float WMH_temperature(float temperature){
     return out;
 }
 
-std::vector<std::vector<float>> fertilityMap(
-    std::vector<std::vector<float>> tempMap, 
-    std::vector<std::vector<float>> humidityMap, 
-    std::vector<std::vector<float>> riverMap) {
+// 260~320 kelvin to Celsius
+inline float temp2celsius(float temp) {return temp*60-13;}
+
+// gram water vapor to mm rainfall
+inline float humid2rainfall(float humid) {return humid*400;}
+
+std::vector<std::vector<float>> calculateFertilityMap(
+    std::vector<std::vector<float>>& tempMap, 
+    std::vector<std::vector<float>>& humidityMap, 
+    std::vector<std::vector<float>>& riverMap) {
     
-    std::vector<std::vector<float>> fert;
     int width = tempMap.size();
     int height = tempMap[0].size();
+    std::vector<std::vector<float>> fert(
+        height, std::vector<float>(width, 0.0));
     if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
         std::cerr << "Error: width and height must be multiples of "
                 << SUB_SCALE << std::endl;
@@ -479,7 +486,10 @@ std::vector<std::vector<float>> fertilityMap(
     fert.resize(width, std::vector<float>(height, 0.0f));
     for (int x = 0; x < width; x += SUB_SCALE) {
         for (int y = 0; y < height; y += SUB_SCALE) {
-            fert[x][y] = WMH_temperature(tempMap[x][y]);
+            float temp = tempMap[x][y];
+            float humidity = humidityMap[x][y];
+            //fert[x][y] = WMH_temperature(temp2celsius(temp))/3000;
+            fert[x][y] = WMH_humidity(humid2rainfall(humidity))/3000;
         }
     }
     interpolateMissingValues(fert, SUB_SCALE);
