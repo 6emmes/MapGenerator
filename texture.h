@@ -24,7 +24,8 @@ TextureData shadingTexture(int w, int h, const std::vector<std::vector<float>>& 
 // Saves the given heightmap to a 24‑bit BMP file. Returns true on success.
 bool saveHeightMapBMP(const std::vector<std::vector<float>>& map, const char *filename);
 // New signature: accepts a vector of pointers to 3‑D float layers.
-void saveTiff(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename);
+void saveTiff32(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename);
+void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename);
 // New: generate a climate texture where the red channel encodes temperature.
 TextureData climateTexture(const std::vector<std::vector<float>>& tempMap, const std::vector<std::vector<float>>& humidityMap);
 TextureData riverTexture(const std::vector<std::vector<float>> &riverMap);
