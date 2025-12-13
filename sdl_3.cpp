@@ -61,7 +61,7 @@ void initMapTextures(){
     std::vector<std::vector<float>> waterMap = std::get<1>(heighTuple);
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, heightMap, riverData);
+    std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, waterMap, riverData);
     std::vector<std::vector<float>> idMap = idData(waterMap);
     std::vector<std::vector<float>> metalMap = metalDensity();
     std::vector<std::vector<float>> fertilityMap = calculateFertilityMap(tempMap, humidityMap, riverData);
@@ -96,7 +96,9 @@ void initMapTextures(){
     layerNames.push_back("metal_map");
     layerNames.push_back("fertility_map");
 
-    saveTiff(data, layerNames, "NowaMapa.tiff");
+
+    //saveTiff32(data, layerNames, "NowaMapa32.tiff");
+    saveTiff8(data, layerNames, "NowaMapa8.tiff");
 
     TextureData texData = heightTexture(heightMap);
     TextureData riverTexData = riverTexture(riverData);

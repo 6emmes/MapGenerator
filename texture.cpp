@@ -221,16 +221,17 @@ TextureData climateTexture(const std::vector<std::vector<float>>& tempMap,
     data.width = static_cast<int>(tempMap[0].size());
     data.height = static_cast<int>(tempMap.size());
     data.pixels.resize(data.width * data.height);
+    uint8_t r = 0;
+            uint8_t b = 0;
     for (int y = 0; y < data.height; ++y) {
         for (int x = 0; x < data.width; ++x) {
             float tempK = tempMap[y][x];
             // Temperature red channel: map 280K (~7°C) to 0 and 320K (~47°C) to 255.
-            uint8_t r = static_cast<uint8_t>(std::clamp(tempK * 255.0, 0.0, 255.0));
+            //r = static_cast<uint8_t>(std::clamp(tempK * 255.0, 0.0, 255.0));
 
             // Humidity blue channel: Scale 0-30 to 0-255.
-            uint8_t b = 0;
             float hum = humidityMap[y][x];
-            b = static_cast<uint8_t>(std::clamp((hum) / 30.0 * 255.0, 0.0, 255.0));
+            b = static_cast<uint8_t>(std::clamp((hum) * 255.0, 0.0, 255.0));
 
             uint32_t pixel = (r << 24) | (0 << 16) | (b << 8) | 0xFF;
             data.pixels[y * data.width + x] = pixel;

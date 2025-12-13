@@ -24,6 +24,8 @@ static int SUB_SCALE = 4;
 
 static int RIVER_LENGTH = 762;
 static int RIVER_COUNT = 4000;
+static float WINDCLAMP = 0.0;
+static double WIND_SCALE_DOWNWARD = 1.0;
 
 static void loadclimateconfig(const std::string &path) {
     std::ifstream fin(path);
@@ -54,6 +56,8 @@ static void loadclimateconfig(const std::string &path) {
             else if (key == "sub_scale") SUB_SCALE = std::stoi(val);
             else if (key == "river_length") RIVER_LENGTH = std::stoi(val);
             else if (key == "river_count") RIVER_COUNT = std::stoi(val);
+            else if (key == "wind_clamp") WINDCLAMP = float(std::stoi(val))/1000;
+            else if (key == "wind_scale_downward") WIND_SCALE_DOWNWARD = std::stoi(val);
         } catch (...) {}
     }
 }
@@ -328,18 +332,19 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
     //Wind direction is {West, North, Up} 
 std::tuple<float, float, float> getWindDirection(float latitudeDeg) {
     latitudeDeg = std::max(-90.0f, std::min(90.0f, latitudeDeg));
+    float ROOT2 = 0.70710678118;
     std::vector<std::pair<float, std::tuple<float, float, float>>> ramp = {
-        {-90.0f,   {1, 1, 0}},      // Polar Easterlies
-        {-60.0f, {0, 0, 1}},      // Subpolar Low
-        {-45.0f,   {-1, -1, 0}},      // Westerlies
-        {-30.0f,  {0, 0, -1}},      // Subtropical High
-        {-15.0f,   {1, 1, 0}},      // SE Trade
-        {0.0f,   {1, 0, 1}},      // ITCZ
-        {15.0f,   {1, -1, 0}},      // NE Trade
-        {30.0f,  {0, 0, -1}},      // Subtropical High
-        {45.0f,   {-1, 1, 0}},      // Westerlies
-        {60.0f, {0, 0, 1}},      // Subpolar Low
-        {90.0f,   {1, -1, 0}},      // Polar Easterlies
+        {-90.0f,   {ROOT2, ROOT2, 0}},      // Polar Easterlies
+        {-60.0f, {0, 0, 1}},                // Subpolar Low
+        {-45.0f,   {-ROOT2, -ROOT2, 0}},    // Westerlies
+        {-30.0f,  {0, 0, -1}},              // Subtropical High
+        {-15.0f,   {ROOT2, ROOT2, 0}},      // SE Trade
+        {0.0f,   {1, 0, 1}},                // ITCZ
+        {15.0f,   {ROOT2, -ROOT2, 0}},      // NE Trade
+        {30.0f,  {0, 0, -1}},               // Subtropical High
+        {45.0f,   {-ROOT2, ROOT2, 0}},      // Westerlies
+        {60.0f, {0, 0, 1}},                 // Subpolar Low
+        {90.0f,   {ROOT2, -ROOT2, 0}},      // Polar Easterlies
     };
     for (size_t i = 1; i < ramp.size(); ++i) {
         if (latitudeDeg <= ramp[i].first) {
@@ -362,8 +367,9 @@ float calculateWind(float WindComponent, float FromHumidity, float AltitudeDelta
     return  WindComponent * FromHumidity * FohenFactor * WindScale;
 }
 
-float calculateWindSimple(float WindComponent, float FromHumidity, float WindScale){
-    return  FromHumidity * std::clamp(WindComponent * WindScale, 0.0f, 1.0f);
+float calculateWindSimple(float WindComponent, float FromHumidity, float WindScale, float localClamp){
+    //WindComponent = std::clamp(WindComponent * WindScale, 0.0f, WINDCLAMP);
+    return  FromHumidity * std::clamp(WindComponent * WindScale, 0.0f, localClamp);
 }
 
 
@@ -371,9 +377,8 @@ std::vector<std::vector<float>> calculateHumidityMap(
     int width,
     int height,
     const std::vector<std::vector<float>>& tempMap,
-    const std::vector<std::vector<float>>& heightmap,
+    const std::vector<std::vector<float>>& watermap,
     const std::vector<std::vector<float>>& rivermap) {
-    // Create blank output array filled with zeros
     std::vector<std::vector<float>> humidityMap(
         height, std::vector<float>(width, 0.0));
     if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
@@ -390,10 +395,26 @@ std::vector<std::vector<float>> calculateHumidityMap(
     int loopOffset;
     int tmpIndex; //Used to reverse inner loop direction
     float latDelta = (height > 1) ? (LAT_TOP - LAT_BOTTOM) / (height - 1) : 0.0;
+    std::tuple<float, float, float> winddirection;
+    float local_windclamp = std::pow(WINDCLAMP, SUB_SCALE);
+    //debug:
+    std::cout<<"Latitudes: "<<LAT_TOP<<"...."<<LAT_BOTTOM<<std::endl;
+    winddirection = getWindDirection(LAT_TOP);
+    float windW = std::get<0>(winddirection);
+    float windN = std::get<1>(winddirection);
+    float windU = std::get<2>(winddirection);
+    std::cout << "Northern wind directions: " << windW <<" "<< windN<<" "<<windU <<std::endl;
+    winddirection = getWindDirection(LAT_BOTTOM);
+    windW = std::get<0>(winddirection);
+    windN = std::get<1>(winddirection);
+    windU = std::get<2>(winddirection);
+    std::cout << "Southern wind directions: " << windW <<" "<< windN<<" "<<windU <<std::endl;
+    std::cout << "wind: " << local_windclamp <<" - "<<WINDCLAMP <<std::endl;
+
     for (int y = 0; y < height; y += SUB_SCALE) {   //north - south
         float lat = LAT_BOTTOM + latDelta * y;
 
-        std::tuple<float, float, float> winddirection = getWindDirection(lat);
+        winddirection = getWindDirection(lat);
         float windW = std::get<0>(winddirection);
         float windN = std::get<1>(winddirection);
         float windU = std::get<2>(winddirection);
@@ -404,18 +425,18 @@ std::vector<std::vector<float>> calculateHumidityMap(
             watercells = 0;
             rivercells = 0;
             tmpHumidity = 0;
-            tmpIndex = abs(loopOffset - x);
+            tmpIndex = (windW < 0) ? (width - SUB_SCALE - x) : x;
             tmpSaturationValue = saturatedAbsoluteHumidity(tempMap[y][tmpIndex]);
             for (int dy = 0; dy < SUB_SCALE; ++dy) {
                 for (int dx = 0; dx < SUB_SCALE; ++dx) {
                     int yy = y + dy;
                     int xx = tmpIndex + dx;
                     if (yy < height && xx < width) {
-                        if (heightmap[yy][xx] < 0.101f) {
+                        if (watermap[yy][xx] == 0.0) {
                             watercells++;
                         }
                         if (rivermap[yy][xx]>0.0){
-                            rivercells += rivermap[yy][xx]/2;
+                            rivercells += rivermap[yy][xx];
                         }
                     }
                 }
@@ -425,18 +446,46 @@ std::vector<std::vector<float>> calculateHumidityMap(
             if (tmpHumidity<0.1*tmpSaturationValue)tmpHumidity = 0.1*tmpSaturationValue;
             if (y>=SUB_SCALE){   //try wind from north
                 if (windN<0){
-                    tmpWindHumidity = calculateWindSimple(-1*windN, humidityMap[y-SUB_SCALE][tmpIndex], 1.1);
+                    tmpWindHumidity = calculateWindSimple(-1*windN, humidityMap[y-SUB_SCALE][tmpIndex], 10, local_windclamp);
                     if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
                 }
             }
             //East/West wind:
             if(tmpIndex >= SUB_SCALE){
-                tmpWindHumidity = calculateWindSimple(std::abs(windW), humidityMap[y][tmpIndex-SUB_SCALE], 0.8);
+                tmpWindHumidity = calculateWindSimple(std::abs(windW), humidityMap[y][tmpIndex-SUB_SCALE], 10, local_windclamp);
                 if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
             }
-
             humidityMap[y][tmpIndex] = std::clamp(tmpHumidity, 0.0, double(tmpSaturationValue));
+            
+            //Diffusion:
+            // if (y>0 && tmpIndex>0) {
+            //     humidityMap[y][tmpIndex] = (humidityMap[y][tmpIndex] * 2 + humidityMap[y-SUB_SCALE][tmpIndex-SUB_SCALE])/3;
+            // }
         }
+    }
+    //========================second loop
+    for (int y = height-2*SUB_SCALE; y >= 0; y -= SUB_SCALE) {   //north - south
+        float lat = LAT_BOTTOM + latDelta * y;
+
+        std::tuple<float, float, float> winddirection = getWindDirection(lat);
+        float windN = std::get<1>(winddirection);
+        if (windN >= 0){        //calculate wind from south
+            for (int x = 0; x < width; x += SUB_SCALE) {
+                tmpWindHumidity = calculateWindSimple(windN, humidityMap[y+SUB_SCALE][x], 10, local_windclamp);
+                if (tmpWindHumidity>humidityMap[y][x]) {
+                    humidityMap[y][x] = tmpWindHumidity;
+                    humidityMap[y][x] = std::clamp(tmpHumidity, 0.0, saturatedAbsoluteHumidity(tempMap[y][tmpIndex]));
+                }
+            }
+        }
+
+    }
+        //========================third loop
+    for (int y = 0; y < height; y += SUB_SCALE) {
+        for (int x = 0; x < width; x += SUB_SCALE) {
+            humidityMap[y][x] = humidityMap[y][x]/30;
+        }
+
     }
     interpolateMissingValues(humidityMap, SUB_SCALE);
     return humidityMap;
@@ -489,7 +538,8 @@ std::vector<std::vector<float>> calculateFertilityMap(
             float temp = tempMap[x][y];
             float humidity = humidityMap[x][y];
             //fert[x][y] = WMH_temperature(temp2celsius(temp))/3000;
-            fert[x][y] = WMH_humidity(humid2rainfall(humidity))/3000;
+            //fert[x][y] = WMH_humidity(humid2rainfall(humidity))/3000;
+            fert[x][y] = std::min(WMH_humidity(humid2rainfall(humidity)), WMH_temperature(temp2celsius(temp)))/3000;
         }
     }
     interpolateMissingValues(fert, SUB_SCALE);
