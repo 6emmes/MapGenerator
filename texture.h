@@ -34,3 +34,4 @@ TextureData idTexture(const std::vector<std::vector<float>>& waterMap);
 std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& waterMap);
 // Generates a 2D metal‑density map using fbm noise.
 std::vector<std::vector<float>> metalDensity();
+TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, const std::vector<std::vector<float>>&humidityMap, const std::vector<std::vector<float>>&waterMap);

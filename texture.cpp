@@ -3,6 +3,7 @@
 
 #include "texture.h"
 #include "terrain.h"
+#include "colorpalette.h"
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -438,5 +439,86 @@ std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& wa
             }
         }
     }
+    return data;
+}
+
+uint32_t averageRGBA(uint32_t c1, uint32_t c2) {
+    uint32_t r = (((c1 >> 24) & 0xFF) + ((c2 >> 24) & 0xFF)) >> 1;
+    uint32_t g = (((c1 >> 16) & 0xFF) + ((c2 >> 16) & 0xFF)) >> 1;
+    uint32_t b = (((c1 >> 8)  & 0xFF) + ((c2 >> 8)  & 0xFF)) >> 1;
+    uint32_t a = 0xFF;
+    return (r << 24) | (g << 16) | (b << 8) | a;
+}
+
+uint32_t weightedAverageRGBA(uint32_t c1, uint32_t c2, float dist1, float dist2) {
+    // Handle degenerate case: both distances zero → return either color
+    float sum = dist1 + dist2;
+    if (sum == 0.0f) return c1;
+
+    // Inverse-distance weighting
+    float w1 = dist2 / sum;
+    float w2 = dist1 / sum;
+
+    uint32_t r1 = (c1 >> 24) & 0xFF;
+    uint32_t g1 = (c1 >> 16) & 0xFF;
+    uint32_t b1 = (c1 >> 8)  & 0xFF;
+
+    uint32_t r2 = (c2 >> 24) & 0xFF;
+    uint32_t g2 = (c2 >> 16) & 0xFF;
+    uint32_t b2 = (c2 >> 8)  & 0xFF;
+
+    uint32_t r = (uint32_t)(r1 * w1 + r2 * w2);
+    uint32_t g = (uint32_t)(g1 * w1 + g2 * w2);
+    uint32_t b = (uint32_t)(b1 * w1 + b2 * w2);
+
+    return (r << 24) | (g << 16) | (b << 8) | 0xFF;
+}
+
+
+int getColor(float temp, float humidity, std::vector<TextureSample> cloud){
+    double bestDist1 = INFINITY, bestDist2 = INFINITY;
+    int bestValue1 = 0, bestValue2 = 0;
+    float new_temp = temp*1.5;
+    float new_humidity = humidity/30;
+    for (const auto& p: cloud){
+        //double dist = std::abs(p.x - localX) + std::abs(p.y - localY);
+        double dist = std::max(std::abs(p.x - new_temp) , std::abs(p.y - new_humidity));
+        if (dist < bestDist1) {
+            bestDist2 = bestDist1;
+            bestValue2 = bestValue1;
+            bestDist1 = dist;
+            bestValue1 = p.value;
+        }
+         else if (dist < bestDist2) {
+            if (p.value != bestValue1){
+            bestDist2 = dist;
+            bestValue2 = p.value;
+
+            }
+        }
+
+    }
+    if (bestValue1 == 0xff00ffff) return 0xff00ffff;
+    //else if (bestValue2 != 0xff00ffff) return averageRGBA(bestValue1,bestValue2);
+    else if (bestValue2 != 0xff00ffff) return weightedAverageRGBA(bestValue1,bestValue2, bestDist1, bestDist2);
+    else return bestValue1;
+}
+
+TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, const std::vector<std::vector<float>>&humidityMap, const std::vector<std::vector<float>>&waterMap){
+    TextureData data;
+    data.width = TEX_W;
+    data.height = TEX_H;
+    data.pixels.resize(TEX_W * TEX_H);
+    int WHITE = (255 << 24) | (255 << 16) | (255 << 8) | 255;
+    int BLU = (255 << 8) |  255;
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x = 0; x < TEX_W; ++x) {
+            if (waterMap[y][x] == 0) data.pixels[y * TEX_W + x] = BLU;
+            else if (tempMap[y][x] < 0) data.pixels[y * TEX_W + x] = WHITE;
+            else data.pixels[y * TEX_W + x] = getColor(tempMap[y][x], humidityMap[y][x], CLIMATEPALETTE);
+        }
+        //std::cout<<" "<<tempMap[y][3]*1.5<<" ";
+    }
+    //std::cout<<std::endl;
     return data;
 }

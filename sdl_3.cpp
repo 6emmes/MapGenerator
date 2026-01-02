@@ -30,12 +30,14 @@ static SDL_Texture *shadingTex = nullptr;
 static SDL_Texture *climateTex = nullptr;
 static SDL_Texture *riverTex = nullptr;
 static SDL_Texture *waterTex = nullptr;
+static SDL_Texture *colorTex = nullptr;
 // Flags to enable/disable rendering of textures
 static bool g_showTerrainTex = true;
 static bool g_showShadingTex = false;
 static bool g_showClimateTex = false;
 static bool g_showRiverTex = true;
 static bool g_showWaterTex = false;
+static bool g_showColorTex = false;
     // Flags already defined above at file scope
 
 void isNormal(std::vector<std::vector<float>> input){
@@ -65,37 +67,17 @@ void initMapTextures(){
     std::vector<std::vector<float>> idMap = idData(waterMap);
     std::vector<std::vector<float>> metalMap = metalDensity();
     std::vector<std::vector<float>> fertilityMap = calculateFertilityMap(tempMap, humidityMap, riverData);
+    std::vector<std::reference_wrapper<std::vector<std::vector<float>>>> maps = { heightMap, riverData, tempMap,
+                                                                                humidityMap, waterMap, idMap,
+                                                                                metalMap, fertilityMap };
 
-    
-    isNormal(heightMap);
-    isNormal(riverData);
-    isNormal(tempMap);
-    isNormal(humidityMap);
-    isNormal(waterMap);
-    isNormal(idMap);
-    isNormal(metalMap);
-    isNormal(fertilityMap);
+    for (auto& m : maps) isNormal(m.get());
 
+    for (auto& m : maps) data.push_back(&m.get());
 
-    data.push_back(&heightMap);
-    data.push_back(&riverData);
-    data.push_back(&tempMap);
-    data.push_back(&humidityMap);
-    data.push_back(&waterMap);
-    data.push_back(&idMap);
-    data.push_back(&metalMap);
-    data.push_back(&fertilityMap);
-
-    std::vector<std::string> layerNames;
-    layerNames.push_back("height_map");
-    layerNames.push_back("river_map");
-    layerNames.push_back("temp_map");
-    layerNames.push_back("humidity_map");
-    layerNames.push_back("water_map");
-    layerNames.push_back("id_map");
-    layerNames.push_back("metal_map");
-    layerNames.push_back("fertility_map");
-
+    std::vector<std::string> layerNames = { "height_map", "river_map", "temp_map", 
+                                            "humidity_map", "water_map", "id_map", 
+                                            "metal_map", "fertility_map" }; 
 
     //saveTiff32(data, layerNames, "NowaMapa32.tiff");
     saveTiff8(data, layerNames, "NowaMapa8.tiff");
@@ -105,35 +87,39 @@ void initMapTextures(){
     TextureData climateData = climateTexture(tempMap, humidityMap);
     TextureData shadingData = shadingTexture(TEX_W, TEX_H, heightMap, waterMap);
     TextureData waterData = waterTexture(waterMap);
+    TextureData colorData = calculateColorMap(tempMap, humidityMap, waterMap);
     
 
-    terrainTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
-    riverTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
-    climateTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
-    waterTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
-    shadingTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    auto createTex = [&](SDL_Texture*& tex) {
+        tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, TEX_W, TEX_H);
+    };
+
+    createTex(terrainTex);
+    createTex(riverTex);
+    createTex(climateTex);
+    createTex(waterTex);
+    createTex(shadingTex);
+    createTex(colorTex);
 
     SDL_UpdateTexture(terrainTex, NULL, texData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(riverTex, NULL, riverTexData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(waterTex, NULL, waterData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(climateTex, NULL, climateData.pixels.data(), TEX_W * 4);
     SDL_UpdateTexture(shadingTex, NULL, shadingData.pixels.data(), TEX_W * 4);
+    SDL_UpdateTexture(colorTex, NULL, colorData.pixels.data(), TEX_W * 4);
 
 
-    SDL_SetTextureScaleMode(terrainTex, SDL_SCALEMODE_NEAREST);
+    auto setModes = [&](SDL_Texture* tex) {
+        SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+    };
 
-    SDL_SetTextureScaleMode(riverTex, SDL_SCALEMODE_NEAREST);
-    SDL_SetTextureBlendMode(riverTex, SDL_BLENDMODE_BLEND);
-
-    SDL_SetTextureScaleMode(climateTex, SDL_SCALEMODE_NEAREST);
-    SDL_SetTextureBlendMode(climateTex, SDL_BLENDMODE_BLEND);
-
-
-    SDL_SetTextureScaleMode(waterTex, SDL_SCALEMODE_NEAREST);
-    SDL_SetTextureBlendMode(waterTex, SDL_BLENDMODE_BLEND);
-
-    SDL_SetTextureScaleMode(shadingTex, SDL_SCALEMODE_NEAREST);
-    SDL_SetTextureBlendMode(shadingTex, SDL_BLENDMODE_BLEND);
+    setModes(terrainTex);
+    setModes(riverTex);
+    setModes(climateTex);
+    setModes(waterTex);
+    setModes(shadingTex);
+    setModes(colorTex);
 }
 
 
@@ -191,6 +177,9 @@ static void Render()
     if (g_showTerrainTex && terrainTex) {
         SDL_SetRenderDrawColor(renderer, rect.color.r, rect.color.g, rect.color.b, rect.color.a);
         SDL_RenderTexture(renderer, terrainTex, NULL, &dst);
+    }
+    if (g_showColorTex && colorTex) {
+        SDL_RenderTexture(renderer, colorTex, NULL, &dst);
     }
     // Overlay shading texture on top of rectangle, if enabled
     if (g_showShadingTex && shadingTex) {
@@ -251,6 +240,7 @@ int main(int argc, char *argv[])
                     {SDL_SCANCODE_3, &g_showClimateTex},
                     {SDL_SCANCODE_4, &g_showRiverTex},
                     {SDL_SCANCODE_5, &g_showWaterTex},
+                    {SDL_SCANCODE_7, &g_showColorTex},
                 };
                 for (const auto &t : toggles) {
                 if (event.key.scancode == t.scancode) {
