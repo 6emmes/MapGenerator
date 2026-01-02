@@ -22,7 +22,6 @@ static double MAXALTITUDE = 4000.0; // meters
 // Can be overridden by a configuration entry `sub_scale`.
 static int SUB_SCALE = 4;
 
-static int RIVER_LENGTH = 762;
 static int RIVER_COUNT = 4000;
 static float WINDCLAMP = 0.0;
 static double WIND_SCALE_DOWNWARD = 1.0;
@@ -54,7 +53,6 @@ static void loadclimateconfig(const std::string &path) {
             else if (key == "lat_top") LAT_TOP = std::stod(val);
             else if (key == "maxaltitude") MAXALTITUDE = std::stod(val);
             else if (key == "sub_scale") SUB_SCALE = std::stoi(val);
-            else if (key == "river_length") RIVER_LENGTH = std::stoi(val);
             else if (key == "river_count") RIVER_COUNT = std::stoi(val);
             else if (key == "wind_clamp") WINDCLAMP = float(std::stoi(val))/1000;
             else if (key == "wind_scale_downward") WIND_SCALE_DOWNWARD = std::stoi(val);
@@ -119,6 +117,7 @@ std::pair<int, float> createRiver(int width, int height, const std::pair<int,int
             for(int j=-1;j<=1;j++){
                 if(i==0 && j==0) continue;
                 if(i==j || i==-j) continue;
+                if (outOfBounds(currentPoint.first + i, currentPoint.second + j, width, height, 1)) continue;
                 float nh = heightmap[currentPoint.second + j][currentPoint.first + i];
                 if (nh > nextheight) {
                     nextheight = nh;
@@ -211,13 +210,11 @@ std::pair<int, float> createRiver(int width, int height, const std::pair<int,int
     int riverFound = 0;
     float riverHash = 0;
     //=====================================================================Saving the path to the map
-    //std::cout  << "River length: "<< tmpPathSize <<"/"<<riverlen<<std::endl;
     for (int j=0;j<tmpPathSize;j++) {
         currentPoint = tmpPath.top();
         tmpPath.pop();
         if (riverMap[currentPoint.second][currentPoint.first] > 0) {
             riverFound = 1;
-            //delta = delta*10;
             break;
         }
         else riverMap[currentPoint.second][currentPoint.first] = value;
@@ -231,7 +228,6 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     std::vector<std::vector<float>> &heightmap,
     std::vector<std::vector<float>> &landMap) {
     std::vector<std::vector<float>> riverMap(height, std::vector<float>(width, 0.0f));
-    //std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
     std::mt19937 rng(3);
     std::uniform_int_distribution<int> distX(0, static_cast<int>(width - 1));
     std::uniform_int_distribution<int> distY(0, static_cast<int>(height - 1));
@@ -252,6 +248,7 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     std::pair<int, float> tmp;
     int riverHash = 0;
     for (const auto &p : points) {
+    std::cout<<"a"<<std::endl;
         tmp = createRiver(width, height, p, riverMap, heightmap, landMap);
         riversmade += tmp.first;
         riverHash += int(tmp.second*100);
@@ -319,7 +316,8 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
                 altitudeMeters = heightmap[y][x] * MAXALTITUDE; // meters
             }
             float tempShiftK = 6.5 * (altitudeMeters / 1000.0); // K
-            float tempK = baseTemperatureK - tempShiftK;
+            float tempK = (280 + baseTemperatureK - tempShiftK)/2;
+
             tempMap[y][x] = (tempK-260)/60;
             if (tempK > maxtemp) maxtemp = tempK; // debug
         }
@@ -386,7 +384,6 @@ std::vector<std::vector<float>> calculateHumidityMap(
                 << SUB_SCALE << std::endl;
         return humidityMap; // early exit with zeros
     }
-    // Iterate over every sub_scale positions
     double tmpHumidity;
     int watercells = 0;
     float rivercells = 0;
@@ -398,17 +395,6 @@ std::vector<std::vector<float>> calculateHumidityMap(
     std::tuple<float, float, float> winddirection;
     float local_windclamp = std::pow(WINDCLAMP, SUB_SCALE);
     //debug:
-    std::cout<<"Latitudes: "<<LAT_TOP<<"...."<<LAT_BOTTOM<<std::endl;
-    winddirection = getWindDirection(LAT_TOP);
-    float windW = std::get<0>(winddirection);
-    float windN = std::get<1>(winddirection);
-    float windU = std::get<2>(winddirection);
-    std::cout << "Northern wind directions: " << windW <<" "<< windN<<" "<<windU <<std::endl;
-    winddirection = getWindDirection(LAT_BOTTOM);
-    windW = std::get<0>(winddirection);
-    windN = std::get<1>(winddirection);
-    windU = std::get<2>(winddirection);
-    std::cout << "Southern wind directions: " << windW <<" "<< windN<<" "<<windU <<std::endl;
     std::cout << "wind: " << local_windclamp <<" - "<<WINDCLAMP <<std::endl;
 
     for (int y = 0; y < height; y += SUB_SCALE) {   //north - south
@@ -418,8 +404,6 @@ std::vector<std::vector<float>> calculateHumidityMap(
         float windW = std::get<0>(winddirection);
         float windN = std::get<1>(winddirection);
         float windU = std::get<2>(winddirection);
-        if (windW < 0) loopOffset = width-SUB_SCALE;
-        else loopOffset = 0;
 
         for (int x = 0; x < width; x += SUB_SCALE) {    //east - west
             watercells = 0;
@@ -442,11 +426,17 @@ std::vector<std::vector<float>> calculateHumidityMap(
                 }
             }
             tmpHumidity = tmpSaturationValue*0.85*watercells/(SUB_SCALE*SUB_SCALE); // 85% relative humidity from ocean tiles
-            tmpHumidity += rivercells;///(SUB_SCALE*SUB_SCALE);
+            tmpHumidity += rivercells*0.85;
             if (tmpHumidity<0.1*tmpSaturationValue)tmpHumidity = 0.1*tmpSaturationValue;
             if (y>=SUB_SCALE){   //try wind from north
                 if (windN<0){
                     tmpWindHumidity = calculateWindSimple(-1*windN, humidityMap[y-SUB_SCALE][tmpIndex], 10, local_windclamp);
+                    if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
+                }
+            }
+            else{
+                if (windN<0){
+                    tmpWindHumidity = calculateWindSimple(-1*windN, tmpSaturationValue*0.85, 10, local_windclamp);
                     if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
                 }
             }
@@ -455,26 +445,33 @@ std::vector<std::vector<float>> calculateHumidityMap(
                 tmpWindHumidity = calculateWindSimple(std::abs(windW), humidityMap[y][tmpIndex-SUB_SCALE], 10, local_windclamp);
                 if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
             }
+            else{
+                tmpWindHumidity = calculateWindSimple(std::abs(windW), tmpSaturationValue*0.85, 10, local_windclamp);
+                if (tmpWindHumidity>tmpHumidity) tmpHumidity = tmpWindHumidity;
+
+            }
             humidityMap[y][tmpIndex] = std::clamp(tmpHumidity, 0.0, double(tmpSaturationValue));
             
             //Diffusion:
-            // if (y>0 && tmpIndex>0) {
-            //     humidityMap[y][tmpIndex] = (humidityMap[y][tmpIndex] * 2 + humidityMap[y-SUB_SCALE][tmpIndex-SUB_SCALE])/3;
-            // }
+            if (y>0 && tmpIndex>0) {
+                humidityMap[y][tmpIndex] = (humidityMap[y][tmpIndex] * 2 + humidityMap[y-SUB_SCALE][tmpIndex-SUB_SCALE])/3;
+            }
         }
     }
     //========================second loop
-    for (int y = height-2*SUB_SCALE; y >= 0; y -= SUB_SCALE) {   //north - south
+    for (int y = height-SUB_SCALE; y >= 0; y -= SUB_SCALE) {   //north - south
         float lat = LAT_BOTTOM + latDelta * y;
 
         std::tuple<float, float, float> winddirection = getWindDirection(lat);
         float windN = std::get<1>(winddirection);
         if (windN >= 0){        //calculate wind from south
             for (int x = 0; x < width; x += SUB_SCALE) {
-                tmpWindHumidity = calculateWindSimple(windN, humidityMap[y+SUB_SCALE][x], 10, local_windclamp);
+                tmpSaturationValue = saturatedAbsoluteHumidity(tempMap[y][x]);
+                if (y == height-SUB_SCALE) tmpWindHumidity = calculateWindSimple(windN, tmpSaturationValue*0.85, 10, local_windclamp);
+                else tmpWindHumidity = calculateWindSimple(windN, humidityMap[y+SUB_SCALE][x], 10, local_windclamp);
                 if (tmpWindHumidity>humidityMap[y][x]) {
-                    humidityMap[y][x] = tmpWindHumidity;
-                    humidityMap[y][x] = std::clamp(tmpHumidity, 0.0, saturatedAbsoluteHumidity(tempMap[y][tmpIndex]));
+                    //humidityMap[y][x] = tmpWindHumidity;
+                    humidityMap[y][x] = std::clamp(tmpWindHumidity, 0.0f, tmpSaturationValue);
                 }
             }
         }
@@ -490,6 +487,220 @@ std::vector<std::vector<float>> calculateHumidityMap(
     interpolateMissingValues(humidityMap, SUB_SCALE);
     return humidityMap;
 }
+
+static constexpr float OCEAN_REL_HUM = 0.85f; // ocean saturation fraction static
+constexpr float WIND_SCALE = 0.85f; // how "wet" incoming ocean air is
+static constexpr float DIFFUSION_FACTOR = 0.5f; // 0..1, probability / strength of diffusion 
+
+std::vector<std::vector<float>> calculateHumidityMap2(
+    int width,
+    int height,
+    const std::vector<std::vector<float>>& tempMap,
+    const std::vector<std::vector<float>>& watermap,
+    const std::vector<std::vector<float>>& rivermap)
+{
+    std::vector<std::vector<float>> humidityMap(
+        height, std::vector<float>(width, 0.0f));
+
+    if (height % SUB_SCALE != 0 || width % SUB_SCALE != 0) {
+        std::cerr << "Error: width and height must be multiples of "
+                  << SUB_SCALE << std::endl;
+        return humidityMap;
+    }
+
+    const int subScaleSq = SUB_SCALE * SUB_SCALE;
+    float latDelta = (height > 1)
+        ? (LAT_TOP - LAT_BOTTOM) / float(height - 1)
+        : 0.0f;
+
+    std::vector<std::tuple<float,float,float>> windRow(height / SUB_SCALE);
+
+    float local_windclamp = std::pow(WINDCLAMP, SUB_SCALE);
+
+    // ============================================================
+    // FIRST PASS: X wind + Y-south wind
+    // ============================================================
+    for (int by = 0; by < height; by += SUB_SCALE) {
+
+        int rowIndex = by / SUB_SCALE;
+        float lat = LAT_BOTTOM + latDelta * float(by);
+
+        auto wd = getWindDirection(lat);
+        float windW = std::get<0>(wd);
+        float windN = std::get<1>(wd);
+        float windU = std::get<2>(wd);
+
+        windRow[rowIndex] = wd;
+
+        int loopOffset = (windW > 0.0f) ? (width - SUB_SCALE) : 0;
+
+        for (int bx = 0; bx < width; bx += SUB_SCALE) {
+
+            int x0 = std::abs(loopOffset - bx);
+            int y0 = by;
+
+            // --- Aggregate block data ---
+            int waterCells = 0;
+            float riverCells = 0.0f;
+            float tempSum = 0.0f;
+
+            for (int dy = 0; dy < SUB_SCALE; ++dy) {
+                int yy = y0 + dy;
+                if (yy >= height) break;
+
+                for (int dx = 0; dx < SUB_SCALE; ++dx) {
+                    int xx = x0 + dx;
+                    if (xx >= width) break;
+
+                    if (watermap[yy][xx] == 0.0f)
+                        waterCells++;
+
+                    if (rivermap[yy][xx] > 0.0f)
+                        riverCells += rivermap[yy][xx];
+
+                    tempSum += tempMap[yy][xx];
+                }
+            }
+
+            float blockTemp = tempSum / float(subScaleSq);
+            float capacity = saturatedAbsoluteHumidity(blockTemp);
+            float waterRatio = float(waterCells) / float(subScaleSq);
+
+            float blockHumidity = 0.0f;
+
+            // --- Local humidity (ocean vs land) ---
+            if (waterCells == subScaleSq) {
+                blockHumidity = capacity * 0.85f;
+            } else {
+                blockHumidity = capacity * waterRatio * 0.85f;
+                blockHumidity += riverCells * 0.85f;
+            }
+
+            // ============================================================
+            // X WIND
+            // ============================================================
+            if (std::abs(windW) > 0.0f) {
+
+                int upwindX = x0 + SUB_SCALE * ((windW > 0.0f) ? -1 : +1);
+                int upwindY = y0;
+
+                if (upwindX < 0 || upwindX >= width) {
+                    blockHumidity = std::max(blockHumidity, capacity * WIND_SCALE);
+                } else {
+                    float fromHumidity = humidityMap[upwindY][upwindX];
+
+                    float inc = calculateWindSimple(
+                        std::abs(windW),
+                        fromHumidity,
+                        10.0f,
+                        local_windclamp
+                    );
+
+                    blockHumidity = std::max(blockHumidity, inc);
+
+                    // Diffusion
+                    if ((float)std::rand() / RAND_MAX > DIFFUSION_FACTOR) {
+                        float mixed = 0.5f * (blockHumidity + fromHumidity);
+                        humidityMap[upwindY][upwindX] = mixed;
+                        blockHumidity = mixed;
+                    }
+                }
+
+                if (blockHumidity > capacity)
+                    blockHumidity = capacity * WIND_SCALE;
+            }
+
+            // ============================================================
+            // Y-SOUTH WIND (windN < 0)
+            // ============================================================
+            if (windN < 0.0f) {
+
+                int upwindY = y0 - SUB_SCALE;
+                int upwindX = x0;
+
+                if (upwindY < 0 || upwindY >= height) {
+                    blockHumidity = std::max(blockHumidity, capacity * WIND_SCALE);
+                } else {
+                    float fromHumidity = humidityMap[upwindY][upwindX];
+
+                    float inc = calculateWindSimple(
+                        std::abs(windN),
+                        fromHumidity,
+                        10.0f,
+                        local_windclamp
+                    );
+
+                    blockHumidity = std::max(blockHumidity, inc);
+
+                    if (blockHumidity > capacity)
+                        blockHumidity = capacity * WIND_SCALE;
+
+                    // Diffusion
+                    if ((float)std::rand() / RAND_MAX > DIFFUSION_FACTOR) {
+                        float mixed = 0.5f * (blockHumidity + fromHumidity);
+                        humidityMap[upwindY][upwindX] = mixed;
+                        blockHumidity = mixed;
+                    }
+                }
+            }
+
+            humidityMap[y0][x0] = blockHumidity;
+        }
+    }
+
+    // ============================================================
+    // SECOND PASS: Y-NORTH WIND (windN > 0)
+    // ============================================================
+    for (int by = height - SUB_SCALE; by >= 0; by -= SUB_SCALE) {
+
+        int rowIndex = by / SUB_SCALE;
+        float windN = std::get<1>(windRow[rowIndex]);
+
+        if (windN <= 0.0f)
+            continue;
+
+        for (int bx = 0; bx < width; bx += SUB_SCALE) {
+
+            int x0 = bx;
+            int y0 = by;
+
+            float baseHumidity = humidityMap[y0][x0];
+            float capacity = saturatedAbsoluteHumidity(tempMap[y0][x0]);
+
+            int upwindY = y0 + SUB_SCALE;
+
+            if (upwindY < 0 || upwindY >= height) {
+                baseHumidity = std::max(baseHumidity, capacity * WIND_SCALE);
+            } else {
+                float fromHumidity = humidityMap[upwindY][x0];
+
+                float inc = calculateWindSimple(
+                    std::abs(windN),
+                    fromHumidity,
+                    10.0f,
+                    local_windclamp
+                );
+
+                baseHumidity = std::max(baseHumidity, inc);
+
+                if (baseHumidity > capacity)
+                    baseHumidity = capacity * WIND_SCALE;
+
+                if ((float)std::rand() / RAND_MAX > DIFFUSION_FACTOR) {
+                    float mixed = 0.5f * (baseHumidity + fromHumidity);
+                    humidityMap[upwindY][x0] = mixed;
+                    baseHumidity = mixed;
+                }
+            }
+
+            humidityMap[y0][x0] = baseHumidity;
+        }
+    }
+
+    interpolateMissingValues(humidityMap, SUB_SCALE);
+    return humidityMap;
+}
+
 
 //White, Mottershead and Harrison Net Primary Productivity formula for rainfall
 float WMH_humidity(float humidity){
