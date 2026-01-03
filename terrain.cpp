@@ -14,19 +14,19 @@
 int TEX_W = 1024;
 int TEX_H = 1024;
 float NOISE_SCALE = 0.002;
+float RIVER_EVAPORATION = 0.5;
 int OCTAVES = 9;
 constexpr float PERSISTENCE = 0.5f;
-// Seed for random number generation used by generateHeightMap; -1 means use current time
-int SEED = -1;
 // Initialize randSeed based on SEED; if SEED is -1, use current time.
-int initRandSeed() {
-    if (SEED != -1) return SEED;
+int initRandSeed(int seed) {
+    if (seed != -1) return seed;
     return static_cast<int>(std::time(nullptr));
 }
-int randSeed = 0;
+int SEED = 0;
 
 
 void loadConfig(const std::string &path) {
+    int read_seed = -1;
     std::ifstream fin(path);
     if (!fin.is_open()) return; // silently ignore missing file
     std::string line;
@@ -55,21 +55,22 @@ void loadConfig(const std::string &path) {
         if (key == "octaves") OCTAVES = std::stoi(val);
         else if (key == "tex_w") TEX_W = std::stoi(val);
         else if (key == "tex_h") TEX_H = std::stoi(val);
-        else if (key == "seed") SEED = std::stoi(val);
+        else if (key == "seed") read_seed = std::stoi(val);
         else if (key == "noise_scale") NOISE_SCALE = std::stof(val);
+        else if (key == "river_evaporation") RIVER_EVAPORATION = std::stof(val); 
         } catch (...) {
             // ignore malformed integers
         }
     }
     
-    randSeed = initRandSeed();
+    SEED = initRandSeed(read_seed);
 }
 
 
 inline int coordHash(int xi, int yi) {
     uint64_t h = static_cast<uint64_t>(xi) * 0x5DEECE66Dull +
                  static_cast<uint64_t>(yi) * 0xB;
-    h ^= static_cast<uint64_t>(randSeed);
+    h ^= static_cast<uint64_t>(SEED);
     // Final mix step
     h = (h ^ (h >> 33)) * 0xFF51AFD7ED558CCDull;
     h ^= h >> 33;
