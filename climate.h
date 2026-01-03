@@ -17,8 +17,9 @@ std::vector<std::vector<float>> calculateHumidityMap(int width, int height,
                                                     const std::vector<std::vector<float>>& rivermap);
 std::vector<std::vector<float>> calculateHumidityMap2(int width, int height,
                                                     const std::vector<std::vector<float>>& tempMap,
-                                                    const std::vector<std::vector<float>>& heightmap,
-                                                    const std::vector<std::vector<float>>& rivermap);
+                                                    const std::vector<std::vector<float>>& waterMap,
+                                                    const std::vector<std::vector<float>>& heightMap,
+                                                    const std::vector<std::vector<float>>& riverMap);
 // Returns the current subscale value from configuration.
 int getSubscale();
 // Computes saturated absolute humidity (kg/m^3) from temperature in Kelvin.
