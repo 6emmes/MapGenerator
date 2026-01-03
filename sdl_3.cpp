@@ -7,7 +7,7 @@
 #include <iostream>
 #include "texture.h"
 #include "terrain.h"
-
+#include "profiler.h"
 #include "climate.h"
 
 // A simple movable rectangle.
@@ -55,18 +55,27 @@ void isNormal(std::vector<std::vector<float>> input){
 
 void initMapTextures(){
     loadConfig("mapgen.conf");
+    class Profiler p = Profiler();
     
     std::vector<std::vector<std::vector<float>>*> data;
 
     std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> heighTuple = generateHeightMap();
+    p.tick("Heightmap generated");
     std::vector<std::vector<float>> heightMap = std::get<0>(heighTuple);
     std::vector<std::vector<float>> waterMap = std::get<1>(heighTuple);
+    //p.tock();
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
+    p.tick("River map generated");
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
-    std::vector<std::vector<float>> humidityMap = calculateHumidityMap(TEX_W, TEX_H, tempMap, waterMap, riverData);
+    p.tick("Temperature map generated");
+    std::vector<std::vector<float>> humidityMap = calculateHumidityMap2(TEX_W, TEX_H, tempMap, waterMap, heightMap, riverData);
+    p.tick("Humidity map generated");
     std::vector<std::vector<float>> idMap = idData(waterMap);
+    p.tick("ID map generated");
     std::vector<std::vector<float>> metalMap = metalDensity();
+    p.tick("Metal map generated");
     std::vector<std::vector<float>> fertilityMap = calculateFertilityMap(tempMap, humidityMap, riverData);
+    p.tick("Fertility map generated");
     std::vector<std::reference_wrapper<std::vector<std::vector<float>>>> maps = { heightMap, riverData, tempMap,
                                                                                 humidityMap, waterMap, idMap,
                                                                                 metalMap, fertilityMap };
@@ -80,14 +89,22 @@ void initMapTextures(){
                                             "metal_map", "fertility_map" }; 
 
     //saveTiff32(data, layerNames, "NowaMapa32.tiff");
+    p.tock();
     saveTiff8(data, layerNames, "NowaMapa8.tiff");
+    p.tick("Data exported");
 
     TextureData texData = heightTexture(heightMap);
+    p.tick("Height texture data created");
     TextureData riverTexData = riverTexture(riverData);
+    p.tick("River texture data created");
     TextureData climateData = climateTexture(tempMap, humidityMap);
+    p.tick("Climate texture data created");
     TextureData shadingData = shadingTexture(TEX_W, TEX_H, heightMap, waterMap);
+    p.tick("Shading texture data created");
     TextureData waterData = waterTexture(waterMap);
+    p.tick("Water texture data created");
     TextureData colorData = calculateColorMap(tempMap, humidityMap, waterMap);
+    p.tick("Color texture data created");
     
 
     auto createTex = [&](SDL_Texture*& tex) {
@@ -120,6 +137,8 @@ void initMapTextures(){
     setModes(waterTex);
     setModes(shadingTex);
     setModes(colorTex);
+    
+    p.tick("Textures initialized");
 }
 
 
