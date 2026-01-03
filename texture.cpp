@@ -4,6 +4,7 @@
 #include "texture.h"
 #include "terrain.h"
 #include "colorpalette.h"
+#include "colortexture.h"
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -22,7 +23,6 @@ struct Point {
 };
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f) {
-    std::cout<<"cheby"<<std::endl;
     float cx = x - TEX_W / 2.0f;
     float cy = y - TEX_H / 2.0f;
     float distance = 0.0f;
@@ -33,7 +33,7 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f) {
         cy /= ratio;
     }
     distance = std::max(std::abs(cx), std::abs(cy))/ (TEX_W / 2.0f);
-    if (deadzone < distance) {
+    if (deadzone > distance) {
         return 0.0f;
     }   else {
         return distance - deadzone;
@@ -61,10 +61,11 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
             float value = MM(nx, ny, 4);
-            
-            //if (value < 0.f) value = 0.f;
+            //
+            if (value < 0.f) value *= 0.5;
             if (value > maxVal) maxVal = value;
             if (value < minVal) minVal = value;
+            value = value - 6* Chebyshev(x, y, 0.8);
             map[y][x] = value;
         }
     }
@@ -74,7 +75,6 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
             // Normalize to [0,1] based on min/max found
             norm = map[y][x];
             norm = (norm - minVal) / (maxVal - minVal);
-            //norm = norm - 1.5 * Chebyshev(x, y, 0.7);
             norm = simpleMap(norm);
             if (norm < 0) norm=0;
             if (norm > 1) norm=1;
@@ -84,7 +84,6 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
         }
     }
     
-    int changed = 0;
     float value;
     float step = 0.001;//float(1/TEX_H);
     for (int y = 0; y < TEX_H; ++y) {   //poziomo
@@ -277,12 +276,14 @@ TextureData waterTexture(const std::vector<std::vector<float>>& waterMap) {
 
 std::vector<std::vector<float>> metalDensity() {
     std::vector<std::vector<float>> density(TEX_H, std::vector<float>(TEX_W));
+    float frequency = 0.0025;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             // Scale coordinates to control frequency.
-            float nx = static_cast<float>(x) * NOISE_SCALE;
-            float ny = static_cast<float>(y) * NOISE_SCALE;
-            float v = (fbm(nx, ny)- 0.25) *0.571;
+            float nx = static_cast<float>(x) * frequency;
+            float ny = static_cast<float>(y) * frequency;
+            float v = perlin2D(nx, ny) - 0.25;
+            //float v = (fbm(nx, ny)- 0.25) *0.571;
             // Clamp into 0‑1.  The fbm range is roughly [-2,2] for
             // the current settings, so clamping keeps it stable.
             density[y][x] = std::clamp(v, 0.0f, 1.0f);
@@ -475,11 +476,11 @@ uint32_t weightedAverageRGBA(uint32_t c1, uint32_t c2, float dist1, float dist2)
 }
 
 
-int getColor(float temp, float humidity, std::vector<TextureSample> cloud){
+int getColorPalette(float temp, float humidity, std::vector<TextureSample> cloud){
     double bestDist1 = INFINITY, bestDist2 = INFINITY;
     int bestValue1 = 0, bestValue2 = 0;
     float new_temp = temp*1.5;
-    float new_humidity = humidity/30;
+    float new_humidity = humidity;
     for (const auto& p: cloud){
         //double dist = std::abs(p.x - localX) + std::abs(p.y - localY);
         double dist = std::max(std::abs(p.x - new_temp) , std::abs(p.y - new_humidity));
@@ -504,6 +505,12 @@ int getColor(float temp, float humidity, std::vector<TextureSample> cloud){
     else return bestValue1;
 }
 
+inline int getColorTexture(float temp, float humidity){
+    int humidity_pos = (int)(humidity*256);
+    int temp_pos = (int)(temp*1.5*256);
+    return CLIMATETEXTURE[humidity_pos][temp_pos];
+}
+
 TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, const std::vector<std::vector<float>>&humidityMap, const std::vector<std::vector<float>>&waterMap){
     TextureData data;
     data.width = TEX_W;
@@ -515,7 +522,8 @@ TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, con
         for (int x = 0; x < TEX_W; ++x) {
             if (waterMap[y][x] == 0) data.pixels[y * TEX_W + x] = BLU;
             else if (tempMap[y][x] < 0) data.pixels[y * TEX_W + x] = WHITE;
-            else data.pixels[y * TEX_W + x] = getColor(tempMap[y][x], humidityMap[y][x], CLIMATEPALETTE);
+            //else data.pixels[y * TEX_W + x] = getColorPalette(tempMap[y][x], humidityMap[y][x], CLIMATEPALETTE);
+            else data.pixels[y * TEX_W + x] = getColorTexture(tempMap[y][x], humidityMap[y][x]);
         }
         //std::cout<<" "<<tempMap[y][3]*1.5<<" ";
     }

@@ -7,7 +7,7 @@ CFLAGS = -I/usr/local/include/SDL3 -I../tiff-4.5.0/libtiff
 LDFLAGS = -L/usr/local/lib -L../tiff_build/libtiff -lSDL3 -ltiff
 
 TARGETS = sdl_3
-SRCS = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp climate.cpp tiff_write.cpp
+SRCS = sdl_3.cpp texture.cpp terrain.cpp bmp_write.cpp climate.cpp tiff_write.cpp profiler.cpp
 
 all: $(TARGETS)
 
