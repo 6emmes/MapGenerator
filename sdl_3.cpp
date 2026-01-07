@@ -58,12 +58,11 @@ void initMapTextures(){
     class Profiler p = Profiler();
     
     std::vector<std::vector<std::vector<float>>*> data;
+    std::vector<std::vector<float>> heightMap;
+    std::vector<std::vector<float>> waterMap;
 
-    std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> heighTuple = generateHeightMap();
+    std::tie(heightMap, waterMap) = generateHeightMap();
     p.tick("Heightmap generated");
-    std::vector<std::vector<float>> heightMap = std::get<0>(heighTuple);
-    std::vector<std::vector<float>> waterMap = std::get<1>(heighTuple);
-    //p.tock();
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     p.tick("River map generated");
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
@@ -72,13 +71,20 @@ void initMapTextures(){
     p.tick("Humidity map generated");
     std::vector<std::vector<float>> idMap = idData(waterMap);
     p.tick("ID map generated");
-    std::vector<std::vector<float>> metalMap = metalDensity();
+    std::vector<std::vector<float>> metalMap = metalDensity(0.005, 0.2, 0.0, waterMap);
     p.tick("Metal map generated");
-    std::vector<std::vector<float>> fertilityMap = calculateFertilityMap(tempMap, humidityMap, riverData);
+    std::vector<std::vector<float>> silverMap = metalDensity(0.0045, 0.4, 1.0, waterMap);
+    p.tick("Precious metal map generated");
+    std::vector<std::vector<float>> fertilityMap = calculateFertilityMap(tempMap, humidityMap, waterMap);
     p.tick("Fertility map generated");
+    std::vector<std::vector<float>> densityPalm, densityDeciduous, densityConiferous;
+    std::tie(densityPalm, densityDeciduous, densityConiferous) = calculateTreeDensity(0.007, 0.0, waterMap, tempMap, fertilityMap);
+    p.tick("Tree density maps generated");
+    
     std::vector<std::reference_wrapper<std::vector<std::vector<float>>>> maps = { heightMap, riverData, tempMap,
                                                                                 humidityMap, waterMap, idMap,
-                                                                                metalMap, fertilityMap };
+                                                                                metalMap, silverMap, fertilityMap,
+                                                                                densityPalm, densityDeciduous, densityConiferous};
 
     for (auto& m : maps) isNormal(m.get());
 
@@ -86,7 +92,8 @@ void initMapTextures(){
 
     std::vector<std::string> layerNames = { "height_map", "river_map", "temp_map", 
                                             "humidity_map", "water_map", "id_map", 
-                                            "metal_map", "fertility_map" }; 
+                                            "metal_map", "silver_map", "fertility_map",
+                                            "palm_map", "deciduous_map", "coniferous_map"}; 
 
     //saveTiff32(data, layerNames, "NowaMapa32.tiff");
     p.tock();

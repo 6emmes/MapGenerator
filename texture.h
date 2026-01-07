@@ -33,5 +33,8 @@ TextureData waterTexture(const std::vector<std::vector<float>>& waterMap);
 TextureData idTexture(const std::vector<std::vector<float>>& waterMap);
 std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& waterMap);
 // Generates a 2D metal‑density map using fbm noise.
-std::vector<std::vector<float>> metalDensity();
+std::vector<std::vector<float>> metalDensity(float frequency, float bias, float seed, const std::vector<std::vector<float>>& waterMap);
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>, std::vector<std::vector<float>>> calculateTreeDensity(
+    float frequency, float seed, const std::vector<std::vector<float>>& waterMap, const std::vector<std::vector<float>>& tempMap,
+    const std::vector<std::vector<float>>& fertilityMap);
 TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, const std::vector<std::vector<float>>&humidityMap, const std::vector<std::vector<float>>&waterMap);
