@@ -72,6 +72,7 @@ void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std:
     // are assumed to be the same size.
     int height = (*layers[0]).size();
     int width  = (*layers[0])[0].size();
+    uint8_t UNIT8_MAX = 255;
     uint8_t* buffer = new uint8_t[width];
     
     TIFF* tif = TIFFOpen(filename, "w");
@@ -102,7 +103,7 @@ void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std:
         // Write scanlines, dereferencing the pointer for each layer
         for (int row = 0; row < height; ++row) {
             for (int x = 0; x < width; ++x) {
-                buffer[x] = uint8_t((*layers[layer])[row][x]*INT8_MAX);
+                buffer[x] = uint8_t((*layers[layer])[row][x]*UINT8_MAX);
             }
 
             if (TIFFWriteScanline(tif, (void*)buffer, row, 0) < 0) {
