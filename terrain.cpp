@@ -1,4 +1,5 @@
 #include "terrain.h"
+#include "colorramp.h"
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -71,10 +72,9 @@ inline int coordHash(int xi, int yi) {
     uint64_t h = static_cast<uint64_t>(xi) * 0x5DEECE66Dull +
                  static_cast<uint64_t>(yi) * 0xB;
     h ^= static_cast<uint64_t>(SEED);
-    // Final mix step
     h = (h ^ (h >> 33)) * 0xFF51AFD7ED558CCDull;
     h ^= h >> 33;
-    return static_cast<int>(h & 0xFFFFFFFFu); // 32‑bit hash
+    return static_cast<int>(h & 0xFFFFFFFFu);
 }
 
 // Gradient vectors for 2D Perlin noise
@@ -96,10 +96,29 @@ inline float lerp(float t, float a, float b) {
 
 inline float grad(int hash, float x, float y) {
     int h = hash & 7; // 8 directions
+    //  h ^= h >> 13;
+    //  h *= 0xC2B2AE35;
+    //  h ^= h >> 16;
+    //  h = h & 7;
     float u = GRADIENTS[h][0];
     float v = GRADIENTS[h][1];
     return u * x + v * y; // dot product with offset
 }
+
+inline float gradFast(uint32_t h, float x, float y) {
+    // 8 gradients encoded in 3 bits
+    switch (h & 7) {
+        case 0: return  x + y;
+        case 1: return  x - y;
+        case 2: return -x + y;
+        case 3: return -x - y;
+        case 4: return  x;
+        case 5: return -x;
+        case 6: return  y;
+        default: return -y;
+    }
+}
+
 
 //--- Perlin noise ------------------------------------------------------------
 float perlin2D(float x, float y) {
@@ -115,8 +134,8 @@ float perlin2D(float x, float y) {
     int ab = coordHash(xi, yi + 1);
     int ba = coordHash(xi + 1, yi);
     int bb = coordHash(xi + 1, yi + 1);
-    float x1 = lerp(u, grad(aa, xf, yf), grad(ba, xf-1, yf));
-    float x2 = lerp(u, grad(ab, xf, yf-1), grad(bb, xf-1, yf-1));
+    float x1 = lerp(u, gradFast(aa, xf, yf), gradFast(ba, xf-1, yf));
+    float x2 = lerp(u, gradFast(ab, xf, yf-1), gradFast(bb, xf-1, yf-1));
     return lerp(v, x1, x2);
 }
 
@@ -151,7 +170,7 @@ float simpleMap(float val) {
     const float slope1 = 0.3f;   // can be chosen
     const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
 
-        float intercept = slope1 * breakpoint;
+    float intercept = slope1 * breakpoint;
     float y1 = slope1 * val;
     float y2 = intercept + slope2 * (val - breakpoint);
 
@@ -163,25 +182,9 @@ float simpleMap(float val) {
 }
 
 //--- Terrain color mapping ----------------------------------------------------
-Color getTerrainPixel(float height) {
+uint32_t getTerrainPixel(float height) {
+    if (height==0) return 0x000099ff; // water color
     height = std::max(0.0f, std::min(1.0f, height));
-    std::vector<std::pair<float, Color>> ramp = {
-        {0.0f,   {0, 0, 255}},      // Blue
-        {0.0999f, {0, 0, 255}},      // Blue
-        {0.1f,   {0, 77, 0}},       // Dark Green
-        {0.35f,  {0, 204, 0}},     // Green
-        {0.5f,   {255, 255, 0}},    // Yellow
-        {0.8f,   {255, 0, 0}},      // Red
-        {0.95f,   {80, 0, 0}},      // Maroon
-    };
-    for (size_t i = 1; i < ramp.size(); ++i) {
-        if (height <= ramp[i].first) {
-            float t = (height - ramp[i-1].first) / (ramp[i].first - ramp[i-1].first);
-            Color c = { static_cast<uint8_t>(ramp[i-1].second.r + (ramp[i].second.r - ramp[i-1].second.r) * t),
-                        static_cast<uint8_t>(ramp[i-1].second.g + (ramp[i].second.g - ramp[i-1].second.g) * t),
-                        static_cast<uint8_t>(ramp[i-1].second.b + (ramp[i].second.b - ramp[i-1].second.b) * t)};
-            return c;
-        }
-    }
-    return ramp.back().second;
+    int heightIndex = static_cast<int>(height * 256.0f);
+    return COLOR_RAMP[heightIndex];
 }
