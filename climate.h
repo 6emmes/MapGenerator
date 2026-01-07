@@ -28,5 +28,5 @@ void interpolateMissingValues(std::vector<std::vector<double>>& grid, int subSca
 std::vector<std::vector<float>> calculateFertilityMap(
     std::vector<std::vector<float>>& tempMap, 
     std::vector<std::vector<float>>& humidityMap, 
-    std::vector<std::vector<float>>& riverMap);
+    std::vector<std::vector<float>>& waterMap);
 

@@ -10,6 +10,7 @@
 #include <utility>
 #include <tuple>
 #include <algorithm>
+#include "helper.h"
 
 // Latitude bounds read from configuration
 static double LAT_BOTTOM = 0.0;
@@ -25,6 +26,8 @@ static int SUB_SCALE = 4;
 static int RIVER_COUNT = 4000;
 static float WINDCLAMP = 0.0;
 static double WIND_SCALE_DOWNWARD = 1.0;
+
+extern float RIVER_EVAPORATION;
 
 static void loadclimateconfig(const std::string &path) {
     std::ifstream fin(path);
@@ -281,8 +284,8 @@ double saturatedAbsoluteHumidity(double temperatureK) {
 
 // Compute incoming solar energy from latitude in degrees
 static inline double incomingSolarEnergy(double latitudeDeg) {
-    double POLARPOWER = 180;   //  W/m2
-    double EQUATORPOWER = 311; //  W/m2
+    double POLARPOWER = 150;   //  W/m2 real value is 180
+    double EQUATORPOWER = 350; //  W/m2 real value is 180
     const double deg2rad = 3.14159265358979323846 / 180.0;
     return POLARPOWER + (EQUATORPOWER - POLARPOWER) * std::cos(latitudeDeg * deg2rad);
 }
@@ -545,7 +548,7 @@ std::vector<std::vector<float>> calculateHumidityMap2(
         {
             double cellTemp = 0.0;
             double cellAlt  = 0.0;
-            int    waterCount = 0;
+            float    waterCount = 0;
 
             // Aggregate block data over [y,y+SUB_SCALE) x [x,x+SUB_SCALE)
             for (int dy = 0; dy < SUB_SCALE; dy++)
@@ -561,8 +564,10 @@ std::vector<std::vector<float>> calculateHumidityMap2(
 
                 if (w == 0.0f)
                     waterCount++;
-                else
+                else{
                     cellAlt += alt;
+                    waterCount += riverMap[yy][xx]*RIVER_EVAPORATION;
+                }
 
                 cellTemp += t;
             }
@@ -678,8 +683,10 @@ std::vector<std::vector<float>> calculateHumidityMap2(
 
                     if (w == 0.0f)
                         waterCount++;
-                    else
+                    else{
                         cellAlt += alt;
+                        waterCount += riverMap[yy][xx]*RIVER_EVAPORATION;
+                    }
 
                     cellTemp += t;
                 }
@@ -756,16 +763,12 @@ float WMH_temperature(float temperature){
     return out;
 }
 
-// 260~320 kelvin to Celsius
-inline float temp2celsius(float temp) {return temp*60-13;}
-
-// gram water vapor to mm rainfall
-inline float humid2rainfall(float humid) {return humid*400;}
-
+// White, Mottershead and Harrison Net Primary Productivity in g/m2 /year
+// Ranges from 0 to ~3000
 std::vector<std::vector<float>> calculateFertilityMap(
     std::vector<std::vector<float>>& tempMap, 
     std::vector<std::vector<float>>& humidityMap, 
-    std::vector<std::vector<float>>& riverMap) {
+    std::vector<std::vector<float>>& waterMap) {
     
     int width = tempMap.size();
     int height = tempMap[0].size();
@@ -781,6 +784,11 @@ std::vector<std::vector<float>> calculateFertilityMap(
         for (int y = 0; y < height; y += SUB_SCALE) {
             float temp = tempMap[x][y];
             float humidity = humidityMap[x][y];
+            if (x==752 && y==752){
+                //debug
+                std::cout << "Debug fertility calc at (" << x << "," << y << "): temp=" << temp2celsius(temp) << "C, humidity=" << humid2rainfall(humidity) << "mm\n";
+                std::cout << "  WMH temp=" << WMH_temperature(temp2celsius(temp)) << ", WMH humid=" << WMH_humidity(humid2rainfall(humidity)) << "\n";
+            }
             //fert[x][y] = WMH_temperature(temp2celsius(temp))/3000;
             //fert[x][y] = WMH_humidity(humid2rainfall(humidity))/3000;
             fert[x][y] = std::min(WMH_humidity(humid2rainfall(humidity)), WMH_temperature(temp2celsius(temp)))/3000;
