@@ -80,11 +80,14 @@ void initMapTextures(){
     std::vector<std::vector<float>> densityPalm, densityDeciduous, densityConiferous;
     std::tie(densityPalm, densityDeciduous, densityConiferous) = calculateTreeDensity(0.007, 0.0, waterMap, tempMap, fertilityMap);
     p.tick("Tree density maps generated");
+    std::vector<std::vector<float>> marbleMap = marbleDensity(heightMap, 2.0);
+    p.tick("Marble density map generated");
     
     std::vector<std::reference_wrapper<std::vector<std::vector<float>>>> maps = { heightMap, riverData, tempMap,
                                                                                 humidityMap, waterMap, idMap,
                                                                                 metalMap, silverMap, fertilityMap,
-                                                                                densityPalm, densityDeciduous, densityConiferous};
+                                                                                densityPalm, densityDeciduous, densityConiferous,
+                                                                                marbleMap};
 
     for (auto& m : maps) isNormal(m.get());
 
@@ -93,9 +96,9 @@ void initMapTextures(){
     std::vector<std::string> layerNames = { "height_map", "river_map", "temp_map", 
                                             "humidity_map", "water_map", "id_map", 
                                             "metal_map", "silver_map", "fertility_map",
-                                            "palm_map", "deciduous_map", "coniferous_map"}; 
+                                            "palm_map", "deciduous_map", "coniferous_map",
+                                            "marble_map"}; 
 
-    //saveTiff32(data, layerNames, "NowaMapa32.tiff");
     p.tock();
     saveTiff8(data, layerNames, "NowaMapa8.tiff");
     p.tick("Data exported");

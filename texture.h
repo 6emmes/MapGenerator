@@ -38,3 +38,4 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>, std
     float frequency, float seed, const std::vector<std::vector<float>>& waterMap, const std::vector<std::vector<float>>& tempMap,
     const std::vector<std::vector<float>>& fertilityMap);
 TextureData calculateColorMap(const std::vector<std::vector<float>>&tempMap, const std::vector<std::vector<float>>&humidityMap, const std::vector<std::vector<float>>&waterMap);
+std::vector<std::vector<float>> marbleDensity(std::vector<std::vector<float>> &heightMap, float seed);

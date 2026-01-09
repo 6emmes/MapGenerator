@@ -11,10 +11,6 @@ std::vector<std::vector<float>> calculateTemperatureMap(int width, int height,
 
 std::tuple<float, float, float> getWindDirection(float latitudeDeg);
 // Generates a humidity map (0‑30 range) aligned with temperature map.
-std::vector<std::vector<float>> calculateHumidityMap(int width, int height,
-                                                    const std::vector<std::vector<float>>& tempMap,
-                                                    const std::vector<std::vector<float>>& heightmap,
-                                                    const std::vector<std::vector<float>>& rivermap);
 std::vector<std::vector<float>> calculateHumidityMap2(int width, int height,
                                                     const std::vector<std::vector<float>>& tempMap,
                                                     const std::vector<std::vector<float>>& waterMap,
