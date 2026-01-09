@@ -5,10 +5,15 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include "texture.h"
-#include "terrain.h"
+
+#include "climate_maps.h"
+#include "config.h"
+// #include "helper.h"
 #include "profiler.h"
-#include "climate.h"
+#include "data_generation.h"
+// #include "textures_core.h"
+#include "textures_maps.h"
+#include "rivers.h"
 
 // A simple movable rectangle.
 struct Rect

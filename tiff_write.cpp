@@ -3,6 +3,7 @@
 #include <string>
 #include <stdexcept>
 #include <climits>
+#include "textures_core.h"
 
 
 void saveTiff32(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename) {

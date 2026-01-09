@@ -3,7 +3,7 @@
 
 struct TextureSample { double x; double y; uint32_t value;};
 
-extern const std::vector<TextureSample> CLIMATEPALETTE = {
+static const std::vector<TextureSample> CLIMATEPALETTE = {
     {0.000000, 0.000000, 0xfbfafbff},
     {0.078431, 0.000000, 0xffffffff},
     {0.156863, 0.000000, 0xfafafaff},
