@@ -1,0 +1,27 @@
+"height_map"
+    -Znormalizowana wysokość w zakresie 0 ~ maxaltitude (na razie 4000m), 0 == woda
+"river_map"
+    -szerokość rzeki
+"temp_map"
+    -Znormalizowana temperatura w zakresie 260 ~ 320 kelwinów
+"humidity_map"
+    -Znormalizowana wilgotność bezwzględna w zakresie 0 ~ 30 g/m3
+"water_map"
+    -Odległość od wody, 0 == woda
+"id_map"
+    -Id terenu, niskie numery to id lądu, wysokie to id oceanu
+"metal_map"
+    -Złoża metalu, bez jednostek
+"silver_map"
+    -Złoża metalu szlachetnego, bez jednostek
+"fertility_map"
+    -Znormalizowana żyzność w zakresie 0 ~ 3 kt/km2/yr
+"palm_map"
+    -Znormalizowana gęstośc lasu palmowego w zakresie 0 ~ 50 kt/km2
+"deciduous_map"
+    -Znormalizowana gęstośc lasu liściastego w zakresie 0 ~ 50 kt/km2
+"coniferous_map"
+    -Znormalizowana gęstośc lasu iglastego w zakresie 0 ~ 50 kt/km2
+"marble_map"
+    -Złoża marmuru, bez jednostek
+	

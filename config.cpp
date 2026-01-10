@@ -1,5 +1,23 @@
 #include "config.h"
 
+
+double LAT_TOP = 50.0;
+int OCTAVES = 9;
+int TEX_W = 1024;
+int TEX_H = 1024;
+double MAXALTITUDE = 4000.0;
+int SEED = 17;
+float NOISE_SCALE = 0.0025;
+
+int RIVER_COUNT = 1000;
+
+float WINDCLAMP = 0.0;
+double WIND_SCALE_DOWNWARD = 1.0;
+float RIVER_EVAPORATION = 0.5f;
+int SUB_SCALE = 8;
+double LAT_BOTTOM = 40.0;
+
+
 inline int initRandSeed(int seed) {
     if (seed != -1) return seed;
     return static_cast<int>(std::time(nullptr));
