@@ -57,14 +57,9 @@ std::pair<int, float> createRiver(int width, int height, const std::pair<int,int
     int riverlen = 0;
     //=====================================================================Forward search
     for (int i = 0;i<5000;i++){
-        if (i == 4999){
-            if (std::max(abs(minHeightPoint.first - loopStart.first), abs(minHeightPoint.second - loopStart.second)) > 20) {
-                i = 0;
-                loopStart = minHeightPoint;
-            }
-            else return {0,0};
-        }
+        if (i == 4999)return {0,0};
         if (tmpPathFrontier.size() == 0) {
+            //std::cout<<"River dead end reached"<<std::endl;
             return {0,0};
         }
         currentPoint = tmpPathFrontier.front();
@@ -74,7 +69,8 @@ std::pair<int, float> createRiver(int width, int height, const std::pair<int,int
             curheight += curheight/200;
             minHeightPoint = currentPoint;
         }
-        if (waterMap[currentPoint.second][currentPoint.first] == 0) {
+        if (heightmap[currentPoint.second][currentPoint.first] == 0) {
+            //std::cout<<"River reached sea"<<std::endl;
             break;
         }
         if (outOfBounds(currentPoint.second, currentPoint.first, width, height, 1)) continue;
@@ -92,11 +88,22 @@ std::pair<int, float> createRiver(int width, int height, const std::pair<int,int
     std::vector<std::pair<int,int>> neighbors;
     uint16_t index = 0;
     std::stack<std::pair<int,int>> tmpPath;
+    std::pair<int,int> checkPoint = {-1,-1};
     //=====================================================================Reverse trace
+    int debug = 0;
     for (;;){
+        if (tmpPath.size()%10==0){
+            if (currentPoint == checkPoint) {
+                //std::cout<<"River stuck in loop"<<std::endl;
+                return {0,0};
+            }
+            checkPoint = currentPoint;
+        }
+
+        if (debug>1000) break;
+        debug++;
         tmpPath.emplace(currentPoint);
         if (tmpMap[currentPoint.second][currentPoint.first] <= delta) break;
-        //if (riverMap[currentPoint.second][currentPoint.first] > 0) break;
         float curscore = tmpMap[currentPoint.second][currentPoint.first];
         neighbors = {};
         for (const auto& d : directions) {
@@ -140,7 +147,6 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     for (int i = 0; i < RIVER_COUNT; ++i) {
         int x = distX(rng);
         int y = distY(rng);
-        // Filter points whose height > 0.5
         if (heightmap[y][x] > 0.4f) {
             points.emplace_back(x, y);
         }
@@ -152,7 +158,6 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
         tmp = createRiver(width, height, p, riverMap, heightmap, landMap);
         riversmade += tmp.first;
         riverHash += int(tmp.second*100);
-        //break;
     }
     std::cout << "Generated " << riversmade <<" rivers out of "<< points.size() << " starting river points in " << RIVER_COUNT << " attempts.\n";
     std::cout <<"River hash: "<< riverHash <<std::endl;

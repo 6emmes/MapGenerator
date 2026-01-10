@@ -114,11 +114,15 @@ TextureData riverTexture(const std::vector<std::vector<float>>& riverMap) {
     data.width = TEX_W;
     data.height = TEX_H;
     data.pixels.resize(TEX_W * TEX_H);
+    uint32_t pixel;
+    int trans;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             float v = riverMap[y][x];
             uint8_t val = static_cast<uint8_t>(std::clamp(v * 255.f, 0.f, 255.f));
-            uint32_t pixel = (0 << 24) | (0 << 16) | (val << 8) | val;
+            trans = std::clamp(val*4, 0, 255);
+            pixel = (0 << 24) | (0 << 16) | (val << 8) | trans;
+            
             data.pixels[y * TEX_W + x] = pixel;
         }
     }
