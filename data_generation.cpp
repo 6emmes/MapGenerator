@@ -1,4 +1,5 @@
 #include "data_generation.h"
+#include <iostream>
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f) {
 
@@ -45,12 +46,14 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
         }
     }
     float norm;
+    float mapScale = 1/simpleMapScale();
+    std::cout<<"mapScale: "<<mapScale<<std::endl;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             if (water[y][x]==0.0f) continue;
             norm = map[y][x];
             norm = norm / maxVal;
-            norm = simpleMap(norm);
+            norm = simpleMap(norm, mapScale);
             map[y][x] = norm;
         }
     }
@@ -86,8 +89,8 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> gen
 
 std::vector<std::vector<float>> metalDensity(float frequency, float bias, float seed, const std::vector<std::vector<float>>& waterMap) {
     std::vector<std::vector<float>> density(TEX_H, std::vector<float>(TEX_W));
-    float dx = (seed+SEED)*123;
-    float dy = (seed+SEED)*456;
+    float dx = seed*13+SEED%4096;
+    float dy = seed*37+SEED%4096;
     float maxv = -1e10f;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
@@ -325,7 +328,7 @@ std::vector<std::vector<float>> marbleDensity(std::vector<std::vector<float>> &h
             }
         }
     }
-    fillValueGreater(heightMap, densityMap, 0.5f, 1.0f, Point{x,y});
+    fillValueGreater(heightMap, densityMap, 0.6f, 1.0f, Point{x,y});
     interpolateMissingValues(densityMap, 8);
     return densityMap;
 }
