@@ -147,7 +147,7 @@ std::vector<std::vector<float>> generateRiverPoints_main(int width, int height,
     for (int i = 0; i < RIVER_COUNT; ++i) {
         int x = distX(rng);
         int y = distY(rng);
-        if (heightmap[y][x] > 0.4f) {
+        if (heightmap[y][x]*MAXALTITUDE > 1000) {
             points.emplace_back(x, y);
         }
     }

@@ -85,18 +85,35 @@ float MM(float x, float y, int hetero) {
     return total;
 }
 
-float simpleMap(float val) {
-    const float breakpoint = 0.7f;
-    const float slope1 = 0.3f;   // can be chosen
-    const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
+float simpleMapScale(){
+    // const float breakpoint = 0.7f;
+    // const float slope1 = 0.3f;
+    // const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
 
-    float intercept = slope1 * breakpoint;
-    float y1 = slope1 * val;
-    float y2 = intercept + slope2 * (val - breakpoint);
+    // float intercept = slope1 * breakpoint;
+    // float y1 = slope1 * PEAKRATIO;
+    // float y2 = intercept + slope2 * (PEAKRATIO - breakpoint);
 
-    // Logistic blend around breakpoint
-    float sharpness = 20.0f; // higher = sharper transition
-    float t = 1.0f / (1.0f + exp(-sharpness * (val - breakpoint)));
+    // float sharpness = 20.0f;
+    // float t = 1.0f / (1.0f + exp(-sharpness * (PEAKRATIO - breakpoint)));
 
-    return (1.0f - t) * y1 + t * y2;
+    // return (1.0f - t) * y1 + t * y2;
+    return std::pow(PEAKRATIO, 3);
+}
+
+float simpleMap(float val, float scale) {
+    // const float breakpoint = 0.7f;
+    // const float slope1 = 0.3f;
+    // const float slope2 = (1.0f - slope1 * breakpoint) / (1.0f - breakpoint);
+
+    // float intercept = slope1 * breakpoint;
+    // float y1 = slope1 * PEAKRATIO * val;
+    // float y2 = intercept + slope2 * (PEAKRATIO * val - breakpoint);
+
+    // float sharpness = 20.0f;
+    // float t = 1.0f / (1.0f + exp(-sharpness * (PEAKRATIO * val - breakpoint)));
+
+    // return scale * ((1.0f - t) * y1 + t * y2);
+    
+    return scale*std::pow(PEAKRATIO * val, 3);
 }

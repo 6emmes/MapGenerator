@@ -3,9 +3,6 @@
 
 //Wind direction is {West, North, Up} 
 std::tuple<float, float, float> getWindDirection(float latitudeDeg) {
-    if (latitudeDeg < 0){
-        return  {0.0,0.0,0.0};
-    }
     float ROOT2 = 1;//0.70710678118;
     float SCALE = 2;
     float CLAMP = 0.98;

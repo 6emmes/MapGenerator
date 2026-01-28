@@ -6,6 +6,7 @@ int OCTAVES = 9;
 int TEX_W = 1024;
 int TEX_H = 1024;
 double MAXALTITUDE = 4000.0;
+float PEAKRATIO = 0.25;
 int SEED = 17;
 float NOISE_SCALE = 0.0025;
 
@@ -61,5 +62,6 @@ void loadConfig(const std::string &path) {
             else if (key == "river_evaporation") RIVER_EVAPORATION = std::stof(val); 
         } catch (...) {}
     }
+    PEAKRATIO = MAXALTITUDE/10000;
     SEED = initRandSeed(read_seed);
 }

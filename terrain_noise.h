@@ -7,4 +7,5 @@
 float perlin2D(float x, float y);
 float fbm(float x, float y);
 float MM(float x, float y, int hetero);
-float simpleMap(float val);
+float simpleMapScale();
+float simpleMap(float val, float scale);

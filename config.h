@@ -7,6 +7,7 @@ extern int OCTAVES;
 extern int TEX_W;
 extern int TEX_H;
 extern double MAXALTITUDE;
+extern float PEAKRATIO;
 extern int SEED;
 extern float NOISE_SCALE;
 

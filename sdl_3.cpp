@@ -164,7 +164,7 @@ static int Init()
         return -1;
     }
 
-    window = SDL_CreateWindow("Rectangle Demo", 800, 800, SDL_WINDOW_HIDDEN);
+    window = SDL_CreateWindow("MapGenerator", 800, 800, SDL_WINDOW_HIDDEN);
     if (!window) {
         SDL_Log("SDL_CreateWindow() Error: %s", SDL_GetError());
         return -1;
