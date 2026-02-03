@@ -66,7 +66,8 @@ void initMapTextures(){
     std::vector<std::vector<float>> heightMap;
     std::vector<std::vector<float>> waterMap;
 
-    std::tie(heightMap, waterMap) = generateHeightMap();
+    heightMap = generateHeightMap();
+    waterMap = generateWaterMap(heightMap);
     p.tick("Heightmap generated");
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     p.tick("River map generated");
@@ -74,7 +75,7 @@ void initMapTextures(){
     p.tick("Temperature map generated");
     std::vector<std::vector<float>> humidityMap = calculateHumidityMap2(TEX_W, TEX_H, tempMap, waterMap, heightMap, riverData);
     p.tick("Humidity map generated");
-    std::vector<std::vector<float>> idMap = idData(waterMap);
+    std::vector<std::vector<float>> idMap(TEX_H, std::vector<float>(TEX_W, 1.0)); // = idData(waterMap);
     p.tick("ID map generated");
     std::vector<std::vector<float>> metalMap = metalDensity(0.005, 0.2, 0.0, waterMap);
     p.tick("Metal map generated");

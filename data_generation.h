@@ -7,7 +7,8 @@
 #include "helper.h"
 #include "textures_core.h"
 
-std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> generateHeightMap();
+std::vector<std::vector<float>> generateHeightMap();
+std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<float>>& heightMap);
 std::vector<std::vector<float>> metalDensity(float frequency, float bias,
                                             float seed, const std::vector<std::vector<float>>& waterMap);
 std::tuple<std::vector<std::vector<float>>,std::vector<std::vector<float>>, std::vector<std::vector<float>>> calculateTreeDensity(

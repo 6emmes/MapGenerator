@@ -1,19 +1,19 @@
 #include "data_generation.h"
 #include <iostream>
 
-inline float Chebyshev(float x, float y, float deadzone=0.0f) {
+inline float Chebyshev(float x, float y, float deadzone=0.0f, int size_x=TEX_W, int size_y=TEX_H) {
 
-    float cx = x - TEX_W / 2.0f;
-    float cy = y - TEX_H / 2.0f;
+    float cx = x - size_x / 2.0f;
+    float cy = y - size_y / 2.0f;
     float distance = 0.0f;
-    float ratio = static_cast<float>(TEX_H) / static_cast<float>(TEX_W);
+    float ratio = static_cast<float>(size_y) / static_cast<float>(size_x);
     if (ratio > 1.0f) {
         cx *= ratio;
     } else {
         cy /= ratio;
     }
-    cx = cx / (TEX_W / 2.0f);
-    cy = cy / (TEX_H / 2.0f);
+    cx = cx / (size_x / 2.0f);
+    cy = cy / (size_y / 2.0f);
     distance = std::max(std::abs(cx), std::abs(cy));
     if (deadzone > distance) {
         return 0.0f;
@@ -22,69 +22,153 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f) {
     }   
 }
 
-
-std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>> generateHeightMap() {
+std::vector<std::vector<float>> generateHeightMap() {
     srand(SEED);
     float bias = -0.0f;
     int randX = rand()%1200;
     int randY = rand()%1200;
+    int MASK_SIZE = SUB_SCALE*6;
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
-    std::vector<std::vector<float>> water(TEX_H, std::vector<float>(TEX_W, 1024.0));
+    std::vector<std::vector<float>> mask(MASK_SIZE, std::vector<float>(MASK_SIZE));
     float maxVal = -1e10f;
+    float value;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
             float nx = (x + randX) * NOISE_SCALE;
             float ny = (y + randY) * NOISE_SCALE;
-            float value = MM(nx, ny, 4)+bias;
-            value = value - 5 * Chebyshev(x, y, 0.8);
+            value = MM(nx, ny, 4)+bias;
             if (value<0.0) {
                 value = 0;
-                water[y][x] = 0.0f;
             }
             else if (value > maxVal) maxVal = value;
             map[y][x] = value;
         }
     }
+    
     float norm;
     float mapScale = 1/simpleMapScale();
     std::cout<<"mapScale: "<<mapScale<<std::endl;
     for (int y = 0; y < TEX_H; ++y) {
         for (int x = 0; x < TEX_W; ++x) {
-            if (water[y][x]==0.0f) continue;
+            if (map[y][x]==0.0f) continue;
             norm = map[y][x];
             norm = norm / maxVal;
             norm = simpleMap(norm, mapScale);
             map[y][x] = norm;
         }
     }
-    
+    randX = (randX*31)%1200;
+    randY = (randY*17)%1200;
+    maxVal = -10.0;
+    float minVal = 10.0;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            float nx = (x + randX) * NOISE_SCALE;
+            float ny = (y + randY) * NOISE_SCALE;
+            value = fbm(nx, ny)+0.5;
+            float cheby = 1 - Chebyshev(x, y, 0.0, MASK_SIZE, MASK_SIZE)+0.1;
+            value =  cheby * value;
+            if (value > maxVal) maxVal = value;
+            if (value < minVal) minVal = value;
+            mask[y][x] = value;
+        }
+    }
+    std::cout<<"min: "<<minVal<<std::endl;
+    std::cout<<"max: "<<maxVal<<std::endl;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            value = (mask[y][x]-minVal) / (maxVal - minVal)-0.2;
+            if (value < 0.0f) value = 0.0f;
+            mask[y][x] = value;
+        }
+    }
+
+    std::vector<int> toSample = {0, SUB_SCALE, TEX_H-1, TEX_H-1-SUB_SCALE};
+    int cur_y, cur_x;
+
+    for (int y : toSample) {
+        for (int x = 0; x < TEX_W; ++x) {
+            if (map[y][x] > 0.0f) {
+                for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
+                    for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
+                        cur_x = x + mask_x - MASK_SIZE / 2;
+                        cur_y = y + mask_y - MASK_SIZE / 2;
+                        if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
+                            if (x+y%2==0) value = mask[mask_y][mask_x];
+                            else value = mask[mask_x][mask_y];
+                            value = map[cur_y][cur_x] - value*0.2;
+                            if (value < 0.0f) value = 0.0f;
+                            map[cur_y][cur_x] = value;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (int y = 0; y < TEX_H; ++y) {
+        for (int x : toSample) {
+            if (map[y][x] > 0.0f) {
+                for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
+                    for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
+                        cur_x = x + mask_x - MASK_SIZE / 2;
+                        cur_y = y + mask_y - MASK_SIZE / 2;
+                        if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
+                            if (x+y%2==0) value = mask[mask_y][mask_x];
+                            else value = mask[mask_x][mask_y];
+                            value = map[cur_y][cur_x] - value*0.25;
+                            if (value < 0.0f) value = 0.0f;
+                            map[cur_y][cur_x] = value;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return map;
+}
+
+std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<float>> &heightMap){
+    std::vector<std::vector<float>> water(TEX_H, std::vector<float>(TEX_W, 1024.0));
     float value;
     float step = 0.001;
     for (int y = 0; y < TEX_H; ++y) {   //horizontal
         for (int x = 1; x < TEX_W; ++x) {
-            value = water[y][x];
-            if (value == 0) continue;
+            value = heightMap[y][x];
+            if (value == 0) {
+                water[y][x] = 0;
+                continue;
+            }
             if (water[y][x-1]+step<water[y][x]) water[y][x] = water[y][x-1]+step;
         }
         for (int x = TEX_W-2; x >=0; x--) {
-            value = water[y][x];
-            if (value == 0) continue;
+            value = heightMap[y][x];
+            if (value == 0) {
+                water[y][x] = 0;
+                continue;
+            }
             if (water[y][x+1]+step<water[y][x]) water[y][x] = water[y][x+1]+step;
         }
     }
     for (int x = 0; x < TEX_W; ++x) {   //vertical
         for (int y = 1; y < TEX_H; ++y) {
-            value = water[y][x];
-            if (value == 0) continue;
+            value = heightMap[y][x];
+            if (value == 0) {
+                water[y][x] = 0;
+                continue;
+            }
             if (water[y-1][x]+step<water[y][x]) water[y][x] = water[y-1][x]+step;
         }
         for (int y = TEX_H-2; y >=0; y--) {
-            value = water[y][x];
-            if (value == 0) continue;
+            value = heightMap[y][x];
+            if (value == 0) {
+                water[y][x] = 0;
+                continue;
+            }
             if (water[y+1][x]+step<water[y][x]) water[y][x] = water[y+1][x]+step;
         }
     }
-    return {map,water};
+    return water;
 }
 
 std::vector<std::vector<float>> metalDensity(float frequency, float bias, float seed, const std::vector<std::vector<float>>& waterMap) {
