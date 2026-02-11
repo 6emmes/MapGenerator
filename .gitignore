@@ -4,3 +4,5 @@ mapgen.conf
 /libtiff
 /tiff-4.5.0
 /tiff_build
+*.tiff
+*.txt
