@@ -3,6 +3,7 @@
 #include <string>
 #include <stdexcept>
 #include <climits>
+#include <fstream>
 #include "textures_core.h"
 
 
@@ -63,7 +64,7 @@ void saveTiff32(const std::vector<std::vector<std::vector<float>>*>& layers, std
     TIFFClose(tif);
 }
 
-void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename) {
+void saveTiff8(int lat_top, int lat_bot, const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename) {
     if (layers.empty()) {
         throw std::runtime_error("No layers to save.");
     }
@@ -117,5 +118,13 @@ void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std:
     }
     delete buffer;
     TIFFClose(tif);
+    
+    std::ofstream ofs(filename, std::ios::binary | std::ios::app);
+    if (!ofs) {
+        throw std::runtime_error("Failed to open file for appending byte.");
+    }
+    ofs.put(static_cast<char>(lat_top));
+    ofs.put(static_cast<char>(lat_bot));
+    ofs.close();
 }
 

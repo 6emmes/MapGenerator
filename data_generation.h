@@ -26,3 +26,6 @@ void fillValueGreater(const std::vector<std::vector<float>>& dataMap,
                     float targetColor, T fillColor, Point start);
 std::vector<std::vector<float>> idData(const std::vector<std::vector<float>>& waterMap);
 std::vector<std::vector<float>> marbleDensity(std::vector<std::vector<float>> &heightMap, float seed);
+// Returns a per‑pixel shading intensity map (0‑255 float) based on height and land masks.
+std::vector<std::vector<float>> calculateShadingMap(int w, int h,
+    const std::vector<std::vector<float>>& heightmap);

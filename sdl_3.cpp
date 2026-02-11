@@ -69,13 +69,15 @@ void initMapTextures(){
     heightMap = generateHeightMap();
     waterMap = generateWaterMap(heightMap);
     p.tick("Heightmap generated");
+    std::vector<std::vector<float>> shadeMap = calculateShadingMap(TEX_W, TEX_H, heightMap);
+    p.tick("Shade map generated");
     std::vector<std::vector<float>> riverData = generateRiverPoints_main(TEX_W, TEX_H, heightMap, waterMap);
     p.tick("River map generated");
     std::vector<std::vector<float>> tempMap = calculateTemperatureMap(TEX_W, TEX_H, heightMap);
     p.tick("Temperature map generated");
     std::vector<std::vector<float>> humidityMap = calculateHumidityMap2(TEX_W, TEX_H, tempMap, waterMap, heightMap, riverData);
     p.tick("Humidity map generated");
-    std::vector<std::vector<float>> idMap(TEX_H, std::vector<float>(TEX_W, 1.0)); // = idData(waterMap);
+    std::vector<std::vector<float>> idMap = idData(heightMap);
     p.tick("ID map generated");
     std::vector<std::vector<float>> metalMap = metalDensity(0.005, 0.2, 0.0, waterMap);
     p.tick("Metal map generated");
@@ -93,7 +95,7 @@ void initMapTextures(){
                                                                                 humidityMap, waterMap, idMap,
                                                                                 metalMap, silverMap, fertilityMap,
                                                                                 densityPalm, densityDeciduous, densityConiferous,
-                                                                                marbleMap};
+                                                                                marbleMap, shadeMap};
 
     for (auto& m : maps) isNormal(m.get());
 
@@ -103,10 +105,10 @@ void initMapTextures(){
                                             "humidity_map", "water_map", "id_map", 
                                             "metal_map", "silver_map", "fertility_map",
                                             "palm_map", "deciduous_map", "coniferous_map",
-                                            "marble_map"}; 
+                                            "marble_map", "shade_map"}; 
 
     p.tock();
-    saveTiff8(data, layerNames, "NowaMapa8.tiff");
+    saveTiff8(LAT_TOP, LAT_BOTTOM, data, layerNames, "NowaMapa8.tiff");
     p.tick("Data exported");
 
     TextureData texData = heightTexture(heightMap);
@@ -115,7 +117,7 @@ void initMapTextures(){
     p.tick("River texture data created");
     TextureData climateData = climateTexture(tempMap, humidityMap);
     p.tick("Climate texture data created");
-    TextureData shadingData = shadingTexture(TEX_W, TEX_H, heightMap, waterMap);
+    TextureData shadingData = shadingTexture(TEX_W, TEX_H, shadeMap);
     p.tick("Shading texture data created");
     TextureData waterData = waterTexture(waterMap);
     p.tick("Water texture data created");

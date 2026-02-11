@@ -28,4 +28,4 @@ uint32_t blend(uint32_t c00, uint32_t c10, uint32_t c01, uint32_t c11,
 int getColorPalette(float temp, float humidity, std::vector<TextureSample> cloud);
 int getColorTexture(float temp, float humidity);
 uint32_t getTerrainPixel(float height);
-void saveTiff8(const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename);
+void saveTiff8(int lat_top, int lat_bot, const std::vector<std::vector<std::vector<float>>*>& layers, std::vector<std::string> layerNames, const char *filename);

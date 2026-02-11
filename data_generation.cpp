@@ -1,5 +1,59 @@
 #include "data_generation.h"
 #include <iostream>
+#include <algorithm>
+#include <cmath>
+// Calculate per‑pixel shading intensity map based on heightmap and land mask.
+// Returns a 2D vector [x][y] with intensity values 0‑255.
+std::vector<std::vector<float>> calculateShadingMap(int w, int h,
+    const std::vector<std::vector<float>>& heightmap) {
+    std::vector<std::vector<float>> intensityMap(w, std::vector<float>(h, 0.0f));
+    const float inv_two = 1.0f / 1.414213562f; // unused, keep to mirror original
+    float h_left, h_right, h_up, h_down;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (heightmap[x][y] == 0) {
+                continue;
+            }
+            if (x - 1 >= 0)
+                h_left = heightmap[x - 1][y];
+            else
+                h_left = heightmap[x][y];
+            if (x + 1 < w)
+                h_right = heightmap[x + 1][y];
+            else
+                h_right = heightmap[x][y];
+            if (y - 1 >= 0)
+                h_up = heightmap[x][y - 1];
+            else
+                h_up = heightmap[x][y];
+            if (y + 1 < h)
+                h_down = heightmap[x][y + 1];
+            else
+                h_down = heightmap[x][y];
+            float gx = h_right - h_left;
+            float gy = h_down - h_up;
+            float nx = -gx;
+            float ny = -gy;
+            float nz = 0.02f;
+            float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+            nx /= len;
+            ny /= len;
+            nz /= len;
+            // Light vector pointing diagonally down-left
+            float lx = -1.0f, ly = -1.0f, lz = 1.0f;
+            float llen = std::sqrt(lx * lx + ly * ly + lz * lz);
+            lx /= llen;
+            ly /= llen;
+            lz /= llen;
+            float dot = nx * lx + ny * ly + nz * lz;
+            dot = std::clamp(dot, -1.0f, 1.0f);
+            //float intensity = (dot + 1.0f) * 127.5f; // 0‑255
+            float intensity = (dot + 1.0f) * 0.5f; // 0‑1
+            intensityMap[x][y] = intensity;
+        }
+    }
+    return intensityMap;
+}
 
 inline float Chebyshev(float x, float y, float deadzone=0.0f, int size_x=TEX_W, int size_y=TEX_H) {
 
@@ -22,6 +76,24 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f, int size_x=TEX_W, 
     }   
 }
 
+void maskCutter(int x, int y, std::vector<std::vector<float>>& map, std::vector<std::vector<float>>& mask, int MASK_SIZE) {
+    int cur_x, cur_y;
+    float value;
+    for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
+        for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
+            cur_x = x + mask_x - MASK_SIZE / 2;
+            cur_y = y + mask_y - MASK_SIZE / 2;
+            if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
+                if (y*x%2==0) value = mask[mask_y][mask_x];
+                else value = mask[mask_x][mask_y];
+                value = map[cur_y][cur_x] - value*0.2;
+                if (value < 0.0f) value = 0.0f;
+                map[cur_y][cur_x] = value;
+            }
+        }
+    }
+}
+
 std::vector<std::vector<float>> generateHeightMap() {
     srand(SEED);
     float bias = -0.0f;
@@ -29,7 +101,8 @@ std::vector<std::vector<float>> generateHeightMap() {
     int randY = rand()%1200;
     int MASK_SIZE = SUB_SCALE*6;
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
-    std::vector<std::vector<float>> mask(MASK_SIZE, std::vector<float>(MASK_SIZE));
+    std::vector<std::vector<float>> mask_1(MASK_SIZE, std::vector<float>(MASK_SIZE));
+    std::vector<std::vector<float>> mask_2(MASK_SIZE, std::vector<float>(MASK_SIZE));
     float maxVal = -1e10f;
     float value;
     for (int y = 0; y < TEX_H; ++y) {
@@ -54,6 +127,7 @@ std::vector<std::vector<float>> generateHeightMap() {
             norm = map[y][x];
             norm = norm / maxVal;
             norm = simpleMap(norm, mapScale);
+            if (norm < 0.004) norm = 0.004;
             map[y][x] = norm;
         }
     }
@@ -70,16 +144,42 @@ std::vector<std::vector<float>> generateHeightMap() {
             value =  cheby * value;
             if (value > maxVal) maxVal = value;
             if (value < minVal) minVal = value;
-            mask[y][x] = value;
+            mask_1[y][x] = value;
         }
     }
     std::cout<<"min: "<<minVal<<std::endl;
     std::cout<<"max: "<<maxVal<<std::endl;
     for (int y = 0; y < MASK_SIZE; ++y) {
         for (int x = 0; x < MASK_SIZE; ++x) {
-            value = (mask[y][x]-minVal) / (maxVal - minVal)-0.2;
+            value = (mask_1[y][x]-minVal) / (maxVal - minVal)-0.2;
             if (value < 0.0f) value = 0.0f;
-            mask[y][x] = value;
+            mask_1[y][x] = value;
+        }
+    }
+
+    randX = (randX*31)%1200;
+    randY = (randY*17)%1200;
+    maxVal = -10.0;
+    minVal = 10.0;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            float nx = (x + randX) * NOISE_SCALE;
+            float ny = (y + randY) * NOISE_SCALE;
+            value = fbm(nx, ny)+0.5;
+            float cheby = 1 - Chebyshev(x, y, 0.0, MASK_SIZE, MASK_SIZE)+0.1;
+            value =  cheby * value;
+            if (value > maxVal) maxVal = value;
+            if (value < minVal) minVal = value;
+            mask_2[y][x] = value;
+        }
+    }
+    std::cout<<"min: "<<minVal<<std::endl;
+    std::cout<<"max: "<<maxVal<<std::endl;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            value = (mask_2[y][x]-minVal) / (maxVal - minVal)-0.2;
+            if (value < 0.0f) value = 0.0f;
+            mask_2[y][x] = value;
         }
     }
 
@@ -89,19 +189,8 @@ std::vector<std::vector<float>> generateHeightMap() {
     for (int y : toSample) {
         for (int x = 0; x < TEX_W; ++x) {
             if (map[y][x] > 0.0f) {
-                for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
-                    for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
-                        cur_x = x + mask_x - MASK_SIZE / 2;
-                        cur_y = y + mask_y - MASK_SIZE / 2;
-                        if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
-                            if (x+y%2==0) value = mask[mask_y][mask_x];
-                            else value = mask[mask_x][mask_y];
-                            value = map[cur_y][cur_x] - value*0.2;
-                            if (value < 0.0f) value = 0.0f;
-                            map[cur_y][cur_x] = value;
-                        }
-                    }
-                }
+                if (x+y%2==0) maskCutter(x, y, map, mask_1, MASK_SIZE);
+                else maskCutter(x, y, map, mask_2, MASK_SIZE);
             }
         }
     }
@@ -109,19 +198,8 @@ std::vector<std::vector<float>> generateHeightMap() {
     for (int y = 0; y < TEX_H; ++y) {
         for (int x : toSample) {
             if (map[y][x] > 0.0f) {
-                for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
-                    for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
-                        cur_x = x + mask_x - MASK_SIZE / 2;
-                        cur_y = y + mask_y - MASK_SIZE / 2;
-                        if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
-                            if (x+y%2==0) value = mask[mask_y][mask_x];
-                            else value = mask[mask_x][mask_y];
-                            value = map[cur_y][cur_x] - value*0.25;
-                            if (value < 0.0f) value = 0.0f;
-                            map[cur_y][cur_x] = value;
-                        }
-                    }
-                }
+                if (x+y%2==0) maskCutter(x, y, map, mask_1, MASK_SIZE);
+                else maskCutter(x, y, map, mask_2, MASK_SIZE);
             }
         }
     }
@@ -131,7 +209,7 @@ std::vector<std::vector<float>> generateHeightMap() {
 std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<float>> &heightMap){
     std::vector<std::vector<float>> water(TEX_H, std::vector<float>(TEX_W, 1024.0));
     float value;
-    float step = 0.001;
+    float step = 0.004;
     for (int y = 0; y < TEX_H; ++y) {   //horizontal
         for (int x = 1; x < TEX_W; ++x) {
             value = heightMap[y][x];
@@ -140,6 +218,7 @@ std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<f
                 continue;
             }
             if (water[y][x-1]+step<water[y][x]) water[y][x] = water[y][x-1]+step;
+            //if (water[y][x] > 1.0) water[y][x] = 1.0;
         }
         for (int x = TEX_W-2; x >=0; x--) {
             value = heightMap[y][x];
@@ -148,6 +227,7 @@ std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<f
                 continue;
             }
             if (water[y][x+1]+step<water[y][x]) water[y][x] = water[y][x+1]+step;
+            //if (water[y][x] > 1.0) water[y][x] = 1.0;
         }
     }
     for (int x = 0; x < TEX_W; ++x) {   //vertical
@@ -158,6 +238,7 @@ std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<f
                 continue;
             }
             if (water[y-1][x]+step<water[y][x]) water[y][x] = water[y-1][x]+step;
+            //if (water[y][x] > 1.0) water[y][x] = 1.0;
         }
         for (int y = TEX_H-2; y >=0; y--) {
             value = heightMap[y][x];
@@ -166,6 +247,7 @@ std::vector<std::vector<float>> generateWaterMap(const std::vector<std::vector<f
                 continue;
             }
             if (water[y+1][x]+step<water[y][x]) water[y][x] = water[y+1][x]+step;
+            //if (water[y][x] > 1.0) water[y][x] = 1.0;
         }
     }
     return water;
@@ -222,8 +304,8 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<float>>, std
 
     float dx = (seed+SEED)*234;
     float dy = (seed+SEED)*567;
-    const TreeClimate palmClimate = {16.0, 40.0};
-    const TreeClimate deciduousClimate = {8.0, 20.0}; 
+    const TreeClimate palmClimate = {14.0, 40.0};
+    const TreeClimate deciduousClimate = {8.0, 18.0}; 
     const TreeClimate coniferousClimate = {0.0, 12.0};
 
     float PalmTempFactor, DeciduousTempFactor, ConiferousTempFactor;

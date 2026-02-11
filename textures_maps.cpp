@@ -43,6 +43,7 @@ TextureData shadingTexture(int w, int h, const std::vector<std::vector<float>>& 
     float h_right;
     float h_up;
     float h_down;
+    const uint8_t alpha = static_cast<uint8_t>(64); // 75% opacity
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
             if (landMap[x][y] == 0){
@@ -77,7 +78,22 @@ TextureData shadingTexture(int w, int h, const std::vector<std::vector<float>>& 
             float dot = nx*lx + ny*ly + nz*lz;
             dot = std::clamp(dot, -1.0f, 1.0f);
             uint8_t intensity = static_cast<uint8_t>((dot + 1.0f) * 127.5f);
-            const uint8_t alpha = static_cast<uint8_t>(64); // 75% opacity
+            shade.pixels[x * w + y] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
+        }
+    }
+    return shade;
+}
+
+TextureData shadingTexture(int w, int h, std::vector<std::vector<float>>& shadingdata) {
+    TextureData shade;
+    shade.width = w;
+    shade.height = h;
+    shade.pixels.resize(w * h);
+    uint8_t intensity;
+    const uint8_t alpha = static_cast<uint8_t>(64); // 75% opacity
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            intensity = shadingdata[x][y]*255;
             shade.pixels[x * w + y] = (intensity << 24) | (intensity << 16) | (intensity << 8) | alpha;
         }
     }

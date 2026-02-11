@@ -53,7 +53,7 @@ def main():
             subprocess.run([MAPGEN_EXEC], check=True)
 
             # Rename output file
-            mapname_lat = "m_" + mapname + "_"+str(values["lat_top"])+str(values["lat_bottom"])
+            mapname_lat = "m_" + mapname
             new_name = f"{mapname_lat}.tiff"
             if os.path.exists(OUTPUT_FILE):
                 shutil.move(OUTPUT_FILE, new_name)
