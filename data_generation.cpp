@@ -76,20 +76,50 @@ inline float Chebyshev(float x, float y, float deadzone=0.0f, int size_x=TEX_W, 
     }   
 }
 
-void maskCutter(int x, int y, std::vector<std::vector<float>>& map, std::vector<std::vector<float>>& mask, int MASK_SIZE) {
+void maskCutter(int x, int y, std::vector<std::vector<float>>& map, std::vector<std::vector<float>>& mask, int MASK_SIZE, float scale=0.2f) {
     int cur_x, cur_y;
+    int choice = rand()%2;
     float value;
     for (int mask_y = 0; mask_y < MASK_SIZE; ++mask_y) {
         for (int mask_x = 0; mask_x < MASK_SIZE; ++mask_x) {
             cur_x = x + mask_x - MASK_SIZE / 2;
             cur_y = y + mask_y - MASK_SIZE / 2;
             if (cur_x >= 0 && cur_x < TEX_W && cur_y >= 0 && cur_y < TEX_H) {
-                if (y*x%2==0) value = mask[mask_y][mask_x];
+                if (choice == 0) value = mask[mask_y][mask_x];
                 else value = mask[mask_x][mask_y];
-                value = map[cur_y][cur_x] - value*0.2;
+                value = map[cur_y][cur_x] - value*scale;
                 if (value < 0.0f) value = 0.0f;
                 map[cur_y][cur_x] = value;
             }
+        }
+    }
+}
+
+void maskMaker(std::vector<std::vector<float>>& mask, int MASK_SIZE) {
+    int randX = rand()%1024;
+    int randY = rand()%1024;
+    float maxVal = -10.0;
+    float minVal = 10.0;
+    float value;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            float nx = (x + randX) * NOISE_SCALE;
+            float ny = (y + randY) * NOISE_SCALE;
+            value = fbm(nx, ny)+0.5;
+            float cheby = 1 - Chebyshev(x, y, 0.0, MASK_SIZE, MASK_SIZE)+0.1;
+            value =  cheby * value;
+            if (value > maxVal) maxVal = value;
+            if (value < minVal) minVal = value;
+            mask[y][x] = value;
+        }
+    }
+    std::cout<<"min: "<<minVal<<std::endl;
+    std::cout<<"max: "<<maxVal<<std::endl;
+    for (int y = 0; y < MASK_SIZE; ++y) {
+        for (int x = 0; x < MASK_SIZE; ++x) {
+            value = (mask[y][x]-minVal) / (maxVal - minVal)-0.2;
+            if (value < 0.0f) value = 0.0f;
+            mask[y][x] = value;
         }
     }
 }
@@ -99,7 +129,7 @@ std::vector<std::vector<float>> generateHeightMap() {
     float bias = -0.0f;
     int randX = rand()%1200;
     int randY = rand()%1200;
-    int MASK_SIZE = SUB_SCALE*6;
+    int MASK_SIZE = SUB_SCALE*8;
     std::vector<std::vector<float>> map(TEX_H, std::vector<float>(TEX_W));
     std::vector<std::vector<float>> mask_1(MASK_SIZE, std::vector<float>(MASK_SIZE));
     std::vector<std::vector<float>> mask_2(MASK_SIZE, std::vector<float>(MASK_SIZE));
@@ -131,59 +161,11 @@ std::vector<std::vector<float>> generateHeightMap() {
             map[y][x] = norm;
         }
     }
-    randX = (randX*31)%1200;
-    randY = (randY*17)%1200;
-    maxVal = -10.0;
-    float minVal = 10.0;
-    for (int y = 0; y < MASK_SIZE; ++y) {
-        for (int x = 0; x < MASK_SIZE; ++x) {
-            float nx = (x + randX) * NOISE_SCALE;
-            float ny = (y + randY) * NOISE_SCALE;
-            value = fbm(nx, ny)+0.5;
-            float cheby = 1 - Chebyshev(x, y, 0.0, MASK_SIZE, MASK_SIZE)+0.1;
-            value =  cheby * value;
-            if (value > maxVal) maxVal = value;
-            if (value < minVal) minVal = value;
-            mask_1[y][x] = value;
-        }
-    }
-    std::cout<<"min: "<<minVal<<std::endl;
-    std::cout<<"max: "<<maxVal<<std::endl;
-    for (int y = 0; y < MASK_SIZE; ++y) {
-        for (int x = 0; x < MASK_SIZE; ++x) {
-            value = (mask_1[y][x]-minVal) / (maxVal - minVal)-0.2;
-            if (value < 0.0f) value = 0.0f;
-            mask_1[y][x] = value;
-        }
-    }
+    
+    maskMaker(mask_1, MASK_SIZE);
+    maskMaker(mask_2, MASK_SIZE);
 
-    randX = (randX*31)%1200;
-    randY = (randY*17)%1200;
-    maxVal = -10.0;
-    minVal = 10.0;
-    for (int y = 0; y < MASK_SIZE; ++y) {
-        for (int x = 0; x < MASK_SIZE; ++x) {
-            float nx = (x + randX) * NOISE_SCALE;
-            float ny = (y + randY) * NOISE_SCALE;
-            value = fbm(nx, ny)+0.5;
-            float cheby = 1 - Chebyshev(x, y, 0.0, MASK_SIZE, MASK_SIZE)+0.1;
-            value =  cheby * value;
-            if (value > maxVal) maxVal = value;
-            if (value < minVal) minVal = value;
-            mask_2[y][x] = value;
-        }
-    }
-    std::cout<<"min: "<<minVal<<std::endl;
-    std::cout<<"max: "<<maxVal<<std::endl;
-    for (int y = 0; y < MASK_SIZE; ++y) {
-        for (int x = 0; x < MASK_SIZE; ++x) {
-            value = (mask_2[y][x]-minVal) / (maxVal - minVal)-0.2;
-            if (value < 0.0f) value = 0.0f;
-            mask_2[y][x] = value;
-        }
-    }
-
-    std::vector<int> toSample = {0, SUB_SCALE, TEX_H-1, TEX_H-1-SUB_SCALE};
+    std::vector<int> toSample = {SUB_SCALE, TEX_H-1-SUB_SCALE, TEX_H-1, 0};
     int cur_y, cur_x;
 
     for (int y : toSample) {
